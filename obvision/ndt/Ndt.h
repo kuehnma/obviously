@@ -7,7 +7,7 @@ using namespace std;
 
 #include "obcore/base/CartesianCloud.h"
 #include "obcore/base/System.h"
-
+#include "obvision/registration/Registration.h"
 #include "obcore/math/linalg/linalg.h"
 
 using namespace obvious;
@@ -42,7 +42,7 @@ struct NdtCell
  * @brief Represents the normal distribution transform
  * @author Stefan May
  **/
-class Ndt
+class Ndt: public Registration
 {
 public:
   /**
@@ -54,13 +54,6 @@ public:
    * Destructor
    */
   ~Ndt();
-
-  /**
-   * convert enumeration to char*
-   * @param eState state enumeration
-   * @return state string
-   */
-  static const char* state2char(EnumNdtState eState);
 
   /**
    * Sample model point cloud to NDT space
@@ -82,72 +75,20 @@ public:
   void reset();
 
   /**
-   * Set maximum number of iteration steps
-   * @param iterations maximum number of iteration steps
-   */
-  void setMaxIterations(unsigned int iterations);
-
-  /**
-   * Get maximum number of iteration steps
-   * @return maximum number of iteration steps
-   */
-  unsigned int getMaxIterations();
-
-  /**
    * Start iteration
    * @param rms return value of RMS error
    * @param iterations return value of performed iterations
    * @param Tinit apply initial transformation before iteration
    * @return  processing state
    */
-  EnumNdtState iterate(double* rms, unsigned int* iterations, Matrix* Tinit=NULL);
-
-  /**
-   * Get final 4x4 rotation matrix determined through iteration
-   * @return final transformation matrix
-   */
-  Matrix getFinalTransformation4x4();
-
-  /**
-   * Get final rotation matrix determined through iteration
-   * @return final transformation matrix
-   */
-  Matrix getFinalTransformation();
-
-  /**
-   * Get last rotation matrix determined within the last iteration step
-   * @return last transformation matrix
-   */
-  Matrix getLastTransformation();
+  EnumState iterate(double* rms, unsigned int* iterations, Matrix* Tinit=NULL);
 
 private:
-
-  /**
-   * apply transformation to data array
-   * @param data 2D or 3D coordinates
-   * @param size number of points
-   * @param dim dimensionality
-   * @param T transformation matrix
-   */
-  void applyTransformation(double** data, unsigned int size, unsigned int dim, Matrix* T);
-
-  /**
-   * internal memory check routine
-   * @param rows row size of needed memory
-   * @param memsize row size of target memory
-   * @param mem target memory
-   */
-  void checkMemory(unsigned int rows, unsigned int cols, unsigned int &memsize, double** &mem);
 
   int _minX;
   int _maxX;
   int _minY;
   int _maxY;
-
-  /**
-   * maximum number of iterations
-   */
-  unsigned int _maxIterations;
 
   /**
    * size of internal scene buffer
@@ -170,21 +111,6 @@ private:
    * size of scene
    */
   unsigned int _sizeScene;
-
-  /**
-   * final transformation matrix, found after iteration (fixed dimensions for 2D and 3D case)
-   */
-  Matrix* _Tfinal4x4;
-
-  /**
-   * transformation matrix of last step
-   */
-  Matrix* _Tlast;
-
-  /**
-   * dimension of space
-   */
-  int _dim;
 
   double _d1;
 

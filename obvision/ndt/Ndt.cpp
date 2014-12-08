@@ -28,17 +28,17 @@ Ndt::Ndt(int minX, int maxX, int minY, int maxY)
     }
   }
 
-  _maxIterations       = 3;
-  _dim                 = 2;
+  Registration::_maxIterations       = 3;
+  Registration::_dim                 = 2;
   _scene               = NULL;
   _sceneTmp            = NULL;
   _sizeSceneBuf        = 0;
   _sizeScene           = 0;
 
-  _Tfinal4x4           = new Matrix(4, 4);
-  _Tlast               = new Matrix(4, 4);
-  _Tfinal4x4->setIdentity();
-  _Tlast->setIdentity();
+  Registration::_Tfinal4x4           = new Matrix(4, 4);
+  Registration::_Tlast               = new Matrix(4, 4);
+  Registration::_Tfinal4x4->setIdentity();
+  Registration::_Tlast->setIdentity();
 
   // magic numbers taken from ROS implementation
   _d1 = 1.0;
@@ -52,33 +52,7 @@ Ndt::~Ndt()
   System<NdtCell>::deallocate(_model);
   if(_scene != NULL)     System<double>::deallocate(_scene);
   if(_sceneTmp != NULL)  System<double>::deallocate(_sceneTmp);
-  delete _Tlast;
-}
-
-const char* Ndt::state2char(EnumNdtState eState)
-{
-  return g_ndt_states[eState];
-};
-
-bool* createSubsamplingMask(unsigned int* size, double probability)
-{
-  unsigned int sizeOut = 0;
-  bool* mask = new bool[*size];
-  memset(mask, 0, *size * sizeof(*mask));
-  if(probability>1.0) probability = 1.0;
-  if(probability<0.0) probability = 0.0;
-  int probability_thresh = (int)(probability * 1000.0 + 0.5);
-  srand(time(NULL));
-  for(unsigned int i=0; i<*size; i++)
-  {
-    if((rand()%1000)<probability_thresh)
-    {
-      mask[i] = 1;
-      sizeOut++;
-    }
-  }
-  *size = sizeOut;
-  return mask;
+  delete Registration::_Tlast;
 }
 
 void Ndt::setModel(Matrix* coords, double probability)
@@ -91,12 +65,13 @@ void Ndt::setModel(Matrix* coords, double probability)
 
   unsigned int sizeSource = coords->getRows();
   unsigned int sizeModel = sizeSource;
-  bool* mask = createSubsamplingMask(&sizeModel, probability);
+  bool* mask = Registration::createSubsamplingMask(&sizeModel, probability);
 
   for(unsigned int i=0; i<sizeSource; i++)
   {
-    if(mask[i])
-    {
+    //if(mask[i])
+   if(true) //fixme take all points
+   {
       double* coord = new double[2];
       coord[0] = (*coords)(i, 0);
       coord[1] = (*coords)(i, 1);
@@ -106,6 +81,7 @@ void Ndt::setModel(Matrix* coords, double probability)
     }
   }
 
+  //Iterate cells and  calculate covariance and centroid if a cell is occupied
   for(int y=0; y<_maxY-_minY; y++)
   {
     for(int x=0; x<_maxX-_minX; x++)
@@ -114,6 +90,8 @@ void Ndt::setModel(Matrix* coords, double probability)
       if(!cell.isOccupied()) continue;
 
       vector<double*> v = cell.coords;
+
+      // Centroid
       double sumX = 0.0;
       double sumY = 0.0;
       for(unsigned int i=0; i<v.size(); i++)
@@ -126,6 +104,7 @@ void Ndt::setModel(Matrix* coords, double probability)
       cell.centroid[1] = sumY / (double)v.size();
       cout << "centroid: " << cell.centroid[0] << " " << cell.centroid[1] << endl << endl;;
 
+      //Covariance
       Matrix* cov = cell.cov;
       (*cov)(0,0) = 0.0;
       (*cov)(0,1) = 0.0;
@@ -163,9 +142,9 @@ void Ndt::setScene(Matrix* coords, double probability)
 
   unsigned int sizeSource = coords->getRows();
   _sizeScene = sizeSource;
-  bool* mask = createSubsamplingMask(&_sizeScene, probability);
+  bool* mask = Registration::createSubsamplingMask(&_sizeScene, probability);
 
-  checkMemory(_sizeScene, _dim, _sizeSceneBuf, _scene);
+  Registration::checkMemory(_sizeScene, _dim, _sizeSceneBuf, _scene);
   unsigned int idx = 0;
   for(unsigned int i=0; i<sizeSource; i++)
   {
@@ -185,74 +164,26 @@ void Ndt::setScene(Matrix* coords, double probability)
 
 void Ndt::reset()
 {
-  _Tfinal4x4->setIdentity();
+	Registration::_Tfinal4x4->setIdentity();
   if(_sceneTmp) System<double>::copy(_sizeScene, _dim, _scene, _sceneTmp);
 }
 
-void Ndt::setMaxIterations(unsigned int iterations)
+
+EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit)
 {
-  _maxIterations = iterations;
-}
-
-unsigned int Ndt::getMaxIterations()
-{
-  return _maxIterations;
-}
-
-void Ndt::applyTransformation(double** data, unsigned int size, unsigned int dim, Matrix* T)
-{
-  // Apply rotation
-  Matrix R(*T, 0, 0, dim, dim);
-  Matrix::multiply(R, *data, size, dim);
-
-  // Apply translation
-  if(_dim < 3)
-  {
-
-#pragma omp parallel
-{
-#pragma omp for
-  for(unsigned int i=0; i<size; i++)
-  {
-    data[i][0] += (*T)(0,3);
-    data[i][1] += (*T)(1,3);
-  }
-}
-
-  }
-  else
-  {
-
-#pragma omp parallel
-{
-#pragma omp for
-  for(unsigned int i=0; i<size; i++)
-  {
-    data[i][0] += (*T)(0,3);
-    data[i][1] += (*T)(1,3);
-    data[i][2] += (*T)(2,3);
-  }
-}
-
-  } // end if
-
-}
-
-EnumNdtState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit)
-{
-  _Tfinal4x4->setIdentity();
+	Registration::_Tfinal4x4->setIdentity();
 
   if(Tinit)
   {
     applyTransformation(_sceneTmp, _sizeScene, _dim, Tinit);
-    (*_Tfinal4x4) = (*Tinit) * (*_Tfinal4x4);
+    (*Registration::_Tfinal4x4) = (*Tinit) * (*Registration::_Tfinal4x4);
   }
 
   EnumNdtState eRetval = NDT_PROCESSING;
   unsigned int iter = 0;
   //double rms_prev = 10e12;
 
-  for(unsigned int i=0; i<_maxIterations; i++)
+  for(unsigned int i=0; i<Registration::_maxIterations; i++)
   {
     double score = 0;
 
@@ -285,7 +216,7 @@ EnumNdtState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit)
       }
     }
 
-    applyTransformation(_sceneTmp, _sizeScene, _dim, _Tlast);
+    Registration::applyTransformation(_sceneTmp, _sizeScene, _dim, Registration::_Tlast);
     iter++;
   }
 
@@ -294,52 +225,4 @@ EnumNdtState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit)
   return eRetval;
 }	
 
-Matrix Ndt::getFinalTransformation4x4()
-{
-  Matrix T = *_Tfinal4x4;
-  return T;
-}
-
-Matrix Ndt::getFinalTransformation()
-{
-  Matrix T(_dim+1, _dim+1);
-   for(int r=0; r<_dim; r++)
-   {
-      for(int c=0; c<_dim; c++)
-      {
-         T(r,c) = (*_Tfinal4x4)(r,c);
-      }
-      T(r,_dim) = (*_Tfinal4x4)(r,3);
-   }
-
-   for(int c=0; c<_dim; c++)
-      T(_dim,c) = 0;
-
-   T(_dim,_dim) = 1;
-
-  return T;
-}
-
-Matrix Ndt::getLastTransformation()
-{
-  Matrix T = *_Tlast;
-  return T;
-}
-
-void Ndt::checkMemory(unsigned int rows, unsigned int cols, unsigned int &memsize, double** &mem)
-{
-  // first instantiation of buffer
-  if(mem == NULL)
-  {
-    memsize = rows;
-    System<double>::allocate(rows, cols, mem);
-  }
-  // resize buffer, if needed
-  if(rows > memsize)
-  {
-    memsize = rows;
-    if(mem != NULL) System<double>::deallocate(mem);
-    System<double>::allocate(rows, cols, mem);
-  }
-}
 }
