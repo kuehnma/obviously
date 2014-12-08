@@ -179,7 +179,7 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit)
     (*Registration::_Tfinal4x4) = (*Tinit) * (*Registration::_Tfinal4x4);
   }
 
-  EnumNdtState eRetval = NDT_PROCESSING;
+  EnumState eRetval = PROCESSING;
   unsigned int iter = 0;
   //double rms_prev = 10e12;
 

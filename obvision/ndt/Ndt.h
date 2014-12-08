@@ -9,6 +9,7 @@ using namespace std;
 #include "obcore/base/System.h"
 #include "obvision/registration/Registration.h"
 #include "obcore/math/linalg/linalg.h"
+#include "obvision/registration/Registration.h"
 
 using namespace obvious;
 
@@ -42,7 +43,7 @@ struct NdtCell
  * @brief Represents the normal distribution transform
  * @author Stefan May
  **/
-class Ndt: public Registration
+class Ndt: public obvious::Registration
 {
 public:
   /**

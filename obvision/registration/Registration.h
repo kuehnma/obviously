@@ -8,9 +8,6 @@
 #ifndef REGISTRATION_H_
 #define REGISTRATION_H_
 
-#ifndef NDT_H_
-#define NDT_H_
-
 #include <iostream>
 #include <string.h>
 using namespace std;
@@ -50,7 +47,7 @@ public:
 	 * @param estimator transformation estimator
 	 * @param pDistanceThreshold thresholding strategy
 	 */
-	virtual Registration() = 0;
+	Registration();
 
 	/**
 	 * Destructor
@@ -151,7 +148,7 @@ public:
 	 */
 	Matrix getLastTransformation();
 
-private:
+protected:
 
 	/**
 	 * apply transformation to data array
@@ -172,10 +169,13 @@ private:
 	void checkMemory(unsigned int rows, unsigned int cols,
 			unsigned int &memsize, double** &mem);
 
+	bool* createSubsamplingMask(unsigned int* size, double probability);
+
+
 	/**
 	 * maximum number of iterations
 	 */
-	unsigned int Registration::_maxIterations;
+	unsigned int _maxIterations;
 
 	/**
 	 * final transformation matrix, found after iteration (fixed dimensions for 2D and 3D case)

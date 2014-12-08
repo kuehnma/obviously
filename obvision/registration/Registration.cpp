@@ -126,7 +126,26 @@ void Registration::checkMemory(unsigned int rows, unsigned int cols, unsigned in
   }
 }
 
-
+bool* createSubsamplingMask(unsigned int* size, double probability)
+{
+  unsigned int sizeOut = 0;
+  bool* mask = new bool[*size];
+  memset(mask, 0, *size * sizeof(*mask));
+  if(probability>1.0) probability = 1.0;
+  if(probability<0.0) probability = 0.0;
+  int probability_thresh = (int)(probability * 1000.0 + 0.5);
+  srand(time(NULL));
+  for(unsigned int i=0; i<*size; i++)
+  {
+    if((rand()%1000)<probability_thresh)
+    {
+      mask[i] = 1;
+      sizeOut++;
+    }
+  }
+  *size = sizeOut;
+  return mask;
+}
 
 }
 
