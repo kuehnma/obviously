@@ -163,70 +163,99 @@ void Ndt::reset() {
 		System<double>::copy(_sizeScene, _dim, _scene, _sceneTmp);
 }
 
-EnumState Ndt::step(Matrix &hessian, double &score_gradient[3], double &score) {
+EnumState Ndt::step(Matrix &hessian, double* score_gradient, double &score) {
 
 	for (unsigned int j = 0; j < _sizeScene; j++) {
 
 		double transformedScene[_sizeScene][_dim];
 		applyTransformation(transformedScene, _sizeScene, _dim, Tfinal4x4);
-
 		// project transformed scene point to cell
 		int x = floor(transformedScene[j][0] - _minX);
 		int y = floor(transformedScene[j][1] - _minY);
-
 		//Check if projection was successful
 		if (x < 0 && x > _maxX && y < 0 && y > _maxY) {
 			continue;
 		}
-
 		NdtCell cell = _model[y][x];
+
 		// coord zero mean
 		Vector c_zm(2);
 		c_zm(0) = transformedScene[j][0] - cell.centroid[0];
 		c_zm(1) = transformedScene[j][1] - cell.centroid[1];
 		Matrix *cov_inv = cell.cov_inv;
-
-		Vector tmp = Matrix::multiply(*cov_inv, c_zm, false);
-
+    	Vector tmp = Matrix::multiply(*cov_inv, c_zm, false);
 		// likelihood
 		double l = c_zm(0) * tmp(0) + c_zm(1) * tmp(1);
-
 		//score
 		double px = exp(-0.5 * l);
 		score -= px;
 
-		Matrix jacobian1 = new Matrix(2, 1);
-		Matrix jacobian2 = new Matrix(2, 1);
-		Matrix jacobian3 = new Matrix(2, 1);
-		jacobian1(0, 0) = 1;
-		jacobian1(1, 0) = 0;
-		jacobian2(0, 0) = 0;
-		jacobian2(1, 0) = 1;
-		jacobian3(0, 0) = -_sceneTmp[j][0] * sin(angle)
-				- _sceneTmp[j][1] * cos(angle);
-		jacobian3(1, 2) = _sceneTmp[j][0] * cos(angle)
-				- _sceneTmp[j][1] * sin(angle);
+
+		Eigen::Vector2d eMappedPoint(c_zm(0), c_zm(1));
+		Eigen::Matrix2d eCovInv = Eigen::Matrix2d::Zero();
+		eCovInv(0,0) = *cov_inv(0,0);
+		eCovInv(0,1) = *cov_inv(0,1);
+		eCovInv(1,0) = *cov_inv(1,0);
+		eCovInv(1,1) = *cov_inv(1,1);
+
+		Eigen::MatrixXd eJacobian = Eigen::MatrixXd::Zero(2,3);
+		eJacobian(0,0) = 1;		//first column
+		eJacobian(1,0) = 0;
+		eJacobian(0,1) = 0;		//second column
+    	eJacobian(1,1) = 1;
+    	//third column
+    	double angleZ = atan2(Tfinal4x4(1,0),Tfinal4x4(0,0));
+		eJacobian(0,2) = - _sceneTmp[j][0] * sin(angleZ) - _sceneTmp[j][1] * cos(angleZ);
+		eJacobian(1,2) =   _sceneTmp[j][0] * cos(angleZ)	- _sceneTmp[j][1] * sin(angleZ);
 
 		//gradient
-		Vector grad(3);
 		double factor = exp(-0.5 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
-		double xInvC1 = c_zm(0) * *cov_inv(0, 0) + c_zm(1) * *cov_inv(1, 0);
-		double xInvC2 = c_zm(0) * *cov_inv(0, 1) + c_zm(1) * *cov_inv(1, 1);
-		double xInvCJ3 = (xInvC1 * j30 + xInvC2 * j31);
-
-		double j30 = -_sceneTmp[j][0] * sin(angle)
-				- _sceneTmp[j][1] * cos(angle);
-		double j31 = _sceneTmp[j][0] * cos(angle)
-				- _sceneTmp[j][1] * sin(angle);
-		score_gradient[0] += xInvC1 * factor;
-		score_gradient[1] += xInvC2 * factor;
-		score_gradient[2] += xInvCJ3 * factor;
+		for(int g = 0; g<3; g++) {
+			*score_gradient[g] += ( eMappedPoint.transpose() * eCovInv * eJacobian.col(g)) * factor;
+		}
 
 		//hessian
-		double j3InvCj3 =
-		hessian(0,0) += factor * (xInvC1 * -xInvC1  + 0 + *cov_inv(0,0) );
-		hessian(0,1) += factor * (xInvC1 * -xInvC2  + 0 + *cov_inv(1,0) );
-		hessian(0,2) += factor * (xInvC1 * -xInvCJ3 + 0 + *cov_inv() )
+		for(int g = 0; g<3; g++) {
+			for(int h = 0; h<3; h++) {
+				double xCJg =  eMappedPoint.transpose() * eCovInv * eJacobian.col(g);
+				double xCJh =  eMappedPoint.transpose() * eCovInv * eJacobian.col(h);
+				Eigen::Vector2d secondDerivativeVec(0,0);
+				//use different values if g & h == 3
+				if(g == 2 && h == 2) {
+					secondDerivativeVec(0) = - _sceneTmp[j][0] * cos(angleZ) + _sceneTmp[j][1] * cos(angleZ);
+					secondDerivativeVec(1) = - _sceneTmp[j][0] * sin(angleZ) - _sceneTmp[j][1] * cos(angleZ);
+				}
+				double xCSec =  eMappedPoint.transpose() * eCovInv * secondDerivativeVec;
+				double JhCJg = eJacobian.col(h) * eCovInv * eJacobian.col(g);
+				hessian(g,h) += factor * ( xCJg * -xCJh) + xCSec + JhCJg;
+			}
+		}
+
+
+
+
+
+//		Fast code, not implemented yet
+//		//gradient
+//		Vector grad(3);
+//		double factor = exp(-0.5 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
+//		double xInvC1 = c_zm(0) * *cov_inv(0, 0) + c_zm(1) * *cov_inv(1, 0);
+//		double xInvC2 = c_zm(0) * *cov_inv(0, 1) + c_zm(1) * *cov_inv(1, 1);
+//		double xInvCJ3 = (xInvC1 * j30 + xInvC2 * j31);
+//
+//		double j30 = -_sceneTmp[j][0] * sin(angle)
+//				- _sceneTmp[j][1] * cos(angle);
+//		double j31 = _sceneTmp[j][0] * cos(angle)
+//				- _sceneTmp[j][1] * sin(angle);
+//		score_gradient[0] += xInvC1 * factor;
+//		score_gradient[1] += xInvC2 * factor;
+//		score_gradient[2] += xInvCJ3 * factor;
+//
+//		//hessian
+//		double j3InvCj3 =
+//		hessian(0,0) += factor * (xInvC1 * -xInvC1  + 0 + *cov_inv(0,0) );
+//		hessian(0,1) += factor * (xInvC1 * -xInvC2  + 0 + *cov_inv(1,0) );
+//		hessian(0,2) += factor * (xInvC1 * -xInvCJ3 + 0 + *cov_inv() )
 	}
 }
 
@@ -245,9 +274,9 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 	for (unsigned int i = 0; i < Registration::_maxIterations; i++) {
 		double score = 0;
 		double score_gradient[3] = { 0, 0, 0 };
-		Matrix hessian = new Matrix(3, 3);
+		Matrix* hessian = new Matrix(3, 3);
 
-		eRetval = step(hessian, score_gradient, score)
+		eRetval = step(*hessian, &score_gradient, score)
 
 		Registration::applyTransformation(_sceneTmp, _sizeScene, _dim,
 				Registration::_Tlast);

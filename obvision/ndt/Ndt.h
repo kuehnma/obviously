@@ -10,6 +10,7 @@ using namespace std;
 #include "obvision/registration/Registration.h"
 #include "obcore/math/linalg/linalg.h"
 #include "obvision/registration/Registration.h"
+#include <eigen3/Eigen/Dense>
 
 using namespace obvious;
 
@@ -74,6 +75,13 @@ public:
    * Reset state of NDT algorithm
    */
   void reset();
+
+  /**
+   * steps
+   */
+  EnumState step(Matrix &hessian, double* score_gradient, double &score);
+
+
 
   /**
    * Start iteration
