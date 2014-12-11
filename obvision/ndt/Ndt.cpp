@@ -168,8 +168,10 @@ void Ndt::reset() {
 EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		double &score) {
 
+	EnumState retState = NOTMATCHABLE;
 	double** transformedScene;
 	System<double>::allocate(_sizeScene, _dim, transformedScene);
+	transformedScene = _scene;
 	Registration::applyTransformation(transformedScene, _sizeScene, _dim,
 			Registration::_Tfinal4x4);
 
@@ -188,6 +190,8 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 			//fixme use neighbors
 			continue;
 		}
+		retState = PROCESSING;
+
 		// coord zero mean
 		Vector c_zm(2);
 		c_zm(0) = transformedScene[j][0] - cell.centroid[0];
@@ -199,7 +203,7 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		//score
 		double px = exp(-0.1 * l);
 		score -= px;
-		cout<<"likelihood "<<l<<"\n point score "<< px <<"\n Vector  tmp "<<tmp(0)<<" "<<tmp(1)<<endl;
+		//cout<<"likelihood "<<l<<"\n point score "<< px <<"\n Vector  tmp "<<tmp(0)<<" "<<tmp(1)<<endl;
 
 		//fixme known inconsistency because of obviously->eigen conversion
 		Eigen::Vector2d eMappedPoint(c_zm(0), c_zm(1));
@@ -224,8 +228,8 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 
 		//gradient
 		//cout<<"point "<<eMappedPoint<<"\n Cov"<<eCovInv.matrix() <<"\n jacobi "<<eJacobian.matrix()<<endl;
-		double factor = exp(-0.1 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
-		cout<<"Factor: "<<factor<<endl;
+		double factor = exp(-0.5 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
+		//cout<<"Factor: "<<factor<<endl;
 		for (int g = 0; g < 3; g++) {
 			double xCJg =
 					(eMappedPoint.transpose() * eCovInv * eJacobian.col(g));
@@ -279,7 +283,7 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 //		hessian(0,2) += factor * (xInvC1 * -xInvCJ3 + 0 + *cov_inv() )
 	}
 
-	return PROCESSING;
+	return retState;
 }
 
 EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
@@ -295,6 +299,9 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 	EnumState eRetval = PROCESSING;
 	while (eRetval == PROCESSING) {
 		cout << "Iteration: " << iter << endl;
+		if (iter == 4) {
+			cout << "" << endl;
+		}
 		//Reset iteration parameters
 		double score = 0;
 		Eigen::Vector3d score_gradient = Eigen::Vector3d::Zero();
@@ -302,15 +309,23 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 
 		//calculate one iteration
 		eRetval = step(hessian, score_gradient, score);
+		if (eRetval == NOTMATCHABLE) {
+			cout << "ERROR: There were no points in occupied cells" << endl;
+			break;
+		}
 
-		cout<<"Score: "<<score<<"\n hessian: "<<hessian.matrix()<<"\n gradient "<< score_gradient<<endl;
+		//cout<<"Score: "<<score<<"\n hessian: "<<hessian.matrix()<<"\n gradient "<< score_gradient<<endl;
 		//solve registration equation
 		//calculate the parameter vector(rotation, tx, tz)
-		Eigen::VectorXd deltaParam;
-		deltaParam = hessian.inverse() * -score_gradient;
+		Eigen::Vector3d deltaParam;
+		deltaParam = hessian.inverse().colPivHouseholderQr().solve(	-score_gradient);
+		//deltaParam = hessian.inverse() * -score_gradient;
+		cout << "Param: " << deltaParam << endl;
+
+		deltaParam.normalize();
 		Eigen::Matrix4d deltaTF = Eigen::Matrix4d::Zero();
-		composeTransformation(deltaTF, deltaParam(0), deltaParam(1),
-				deltaParam(2));
+		composeTransformation(deltaTF, deltaParam(2), deltaParam(0),
+				deltaParam(1));
 
 		//apply the found transformation for this step
 		EigenMatrix4dToObviouslyMatrix(Registration::_Tlast, deltaTF);
@@ -318,21 +333,17 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 		Registration::applyTransformation(_sceneTmp, _sizeScene, _dim,
 				Registration::_Tlast);
 
-		if (_trace) {
-			_trace->addAssignment(_sceneTmp, _sizeScene);
-		}
 		(*_Tfinal4x4) = (*_Tlast) * (*_Tfinal4x4);
 		iter++;
 
+		if (_trace) {
+			_trace->addAssignment(_sceneTmp, _sizeScene);
+		}
+
 		if (iter >= Registration::_maxIterations)
 			eRetval = MAXITERATIONS;
-
-		cout << "State: " << iter << endl;
-
 	}
-
 	*iterations = iter;
-
 	return eRetval;
 }
 
