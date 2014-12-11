@@ -6,19 +6,19 @@
 
 namespace obvious {
 
-const char* g_ndt_states[] = { "NDT_IDLE", "NDT_PROCESSING", "NDT_NOTMATCHABLE",
-		"NDT_MAXITERATIONS", "NDT_TIMEELAPSED", "NDT_SUCCESS", "NDT_ERROR" };
-
-Ndt::Ndt(int minX, int maxX, int minY, int maxY) {
+Ndt::Ndt(int minX, int maxX, int minY, int maxY, double cellSize) :
+		Registration() {
 
 	_minX = minX;
 	_maxX = maxX;
 	_minY = minY;
 	_maxY = maxY;
-
-	System<NdtCell>::allocate(_maxY - _minY, _maxX - _minX, _model);
-	for (int y = 0; y < _maxY - _minY; y++) {
-		for (int x = 0; x < _maxX - _minX; x++) {
+	_cellSize = cellSize;
+	_numCellsX = (_maxX - _minX) / _cellSize;
+	_numCellsY = (_maxY - _minY) / _cellSize;
+	System<NdtCell>::allocate(_numCellsY, _numCellsX, _model);
+	for (int y = 0; y < _numCellsY; y++) {
+		for (int x = 0; x < _numCellsX; x++) {
 			_model[y][x].centroid = new double[2];
 			_model[y][x].cov = new Matrix(2, 2);
 			_model[y][x].cov_inv = new Matrix(2, 2);
@@ -37,10 +37,6 @@ Ndt::Ndt(int minX, int maxX, int minY, int maxY) {
 	Registration::_Tfinal4x4->setIdentity();
 	Registration::_Tlast->setIdentity();
 
-	// magic numbers taken from ROS implementation
-	_d1 = 1.0;
-	_d2 = 0.05;
-
 	this->reset();
 }
 
@@ -54,6 +50,12 @@ Ndt::~Ndt() {
 }
 
 void Ndt::setModel(Matrix* coords, double probability) {
+
+	if (_trace) {
+		_trace->reset();
+		_trace->setModel(coords);
+	}
+
 	if (coords->getCols() != (size_t) _dim) {
 		cout << "WARNING: Model is not of correct dimensionality. Needed: "
 				<< _dim << endl;
@@ -65,21 +67,20 @@ void Ndt::setModel(Matrix* coords, double probability) {
 	bool* mask = Registration::createSubsamplingMask(&sizeModel, probability);
 
 	for (unsigned int i = 0; i < sizeSource; i++) {
-		//if(mask[i])
-		if (true) //fixme take all points
+		if (mask[i]) //fixme take all points for now
 		{
 			double* coord = new double[2];
 			coord[0] = (*coords)(i, 0);
 			coord[1] = (*coords)(i, 1);
-			int x = floor(coord[0]) - _minX;
-			int y = floor(coord[1]) - _minY;
+			int x = floor((coord[0] - _minX) / _cellSize);
+			int y = floor((coord[1] - _minY) / _cellSize);
 			_model[y][x].coords.push_back(coord);
 		}
 	}
 
 	//Iterate cells and  calculate covariance and centroid if a cell is occupied
-	for (int y = 0; y < _maxY - _minY; y++) {
-		for (int x = 0; x < _maxX - _minX; x++) {
+	for (int y = 0; y < _numCellsY; y++) {
+		for (int x = 0; x < _numCellsX; x++) {
 			NdtCell cell = _model[y][x];
 			if (!cell.isOccupied())
 				continue;
@@ -130,6 +131,7 @@ void Ndt::setModel(Matrix* coords, double probability) {
 }
 
 void Ndt::setScene(Matrix* coords, double probability) {
+
 	if (coords->getCols() != (size_t) _dim) {
 		cout << "WARNING: Scene is not of correct dimensionality " << _dim
 				<< endl;
@@ -163,77 +165,92 @@ void Ndt::reset() {
 		System<double>::copy(_sizeScene, _dim, _scene, _sceneTmp);
 }
 
-EnumState Ndt::step(Matrix &hessian, double* score_gradient, double &score) {
+EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
+		double &score) {
+
+	double** transformedScene;
+	System<double>::allocate(_sizeScene, _dim, transformedScene);
+	Registration::applyTransformation(transformedScene, _sizeScene, _dim,
+			Registration::_Tfinal4x4);
 
 	for (unsigned int j = 0; j < _sizeScene; j++) {
-
-		double transformedScene[_sizeScene][_dim];
-		applyTransformation(transformedScene, _sizeScene, _dim, Tfinal4x4);
 		// project transformed scene point to cell
-		int x = floor(transformedScene[j][0] - _minX);
-		int y = floor(transformedScene[j][1] - _minY);
+		int x = floor((transformedScene[j][0] - _minX) / _cellSize);
+		int y = floor((transformedScene[j][1] - _minY) / _cellSize);
 		//Check if projection was successful
-		if (x < 0 && x > _maxX && y < 0 && y > _maxY) {
+		if (x < 0 || x > _numCellsY || y < 0 || y > _numCellsY) {
 			continue;
 		}
 		NdtCell cell = _model[y][x];
 
+		if (!cell.isOccupied()) {
+			//Jump is there are not enough points in the cell
+			//fixme use neighbors
+			continue;
+		}
 		// coord zero mean
 		Vector c_zm(2);
 		c_zm(0) = transformedScene[j][0] - cell.centroid[0];
 		c_zm(1) = transformedScene[j][1] - cell.centroid[1];
 		Matrix *cov_inv = cell.cov_inv;
-    	Vector tmp = Matrix::multiply(*cov_inv, c_zm, false);
+		Vector tmp = Matrix::multiply(*cov_inv, c_zm, false);
 		// likelihood
 		double l = c_zm(0) * tmp(0) + c_zm(1) * tmp(1);
 		//score
 		double px = exp(-0.5 * l);
 		score -= px;
 
-
+		//fixme known inconsistency because of obviously->eigen conversion
 		Eigen::Vector2d eMappedPoint(c_zm(0), c_zm(1));
 		Eigen::Matrix2d eCovInv = Eigen::Matrix2d::Zero();
-		eCovInv(0,0) = *cov_inv(0,0);
-		eCovInv(0,1) = *cov_inv(0,1);
-		eCovInv(1,0) = *cov_inv(1,0);
-		eCovInv(1,1) = *cov_inv(1,1);
+		eCovInv(0, 0) = (*cov_inv)(0, 0);
+		eCovInv(0, 1) = (*cov_inv)(0, 1);
+		eCovInv(1, 0) = (*cov_inv)(1, 0);
+		eCovInv(1, 1) = (*cov_inv)(1, 1);
 
-		Eigen::MatrixXd eJacobian = Eigen::MatrixXd::Zero(2,3);
-		eJacobian(0,0) = 1;		//first column
-		eJacobian(1,0) = 0;
-		eJacobian(0,1) = 0;		//second column
-    	eJacobian(1,1) = 1;
-    	//third column
-    	double angleZ = atan2(Tfinal4x4(1,0),Tfinal4x4(0,0));
-		eJacobian(0,2) = - _sceneTmp[j][0] * sin(angleZ) - _sceneTmp[j][1] * cos(angleZ);
-		eJacobian(1,2) =   _sceneTmp[j][0] * cos(angleZ)	- _sceneTmp[j][1] * sin(angleZ);
+		Eigen::MatrixXd eJacobian = Eigen::MatrixXd::Zero(2, 3);
+		eJacobian(0, 0) = 1;		//first column
+		eJacobian(1, 0) = 0;
+		eJacobian(0, 1) = 0;		//second column
+		eJacobian(1, 1) = 1;
+		//third column
+		double angleZ = atan2((*Registration::_Tfinal4x4)(1, 0),
+				(*Registration::_Tfinal4x4)(0, 0));
+		eJacobian(0, 2) = -_sceneTmp[j][0] * sin(angleZ)
+				- _sceneTmp[j][1] * cos(angleZ);
+		eJacobian(1, 2) = _sceneTmp[j][0] * cos(angleZ)
+				- _sceneTmp[j][1] * sin(angleZ);
 
 		//gradient
 		double factor = exp(-0.5 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
-		for(int g = 0; g<3; g++) {
-			*score_gradient[g] += ( eMappedPoint.transpose() * eCovInv * eJacobian.col(g)) * factor;
+		for (int g = 0; g < 3; g++) {
+			double xCJg =
+					(eMappedPoint.transpose() * eCovInv * eJacobian.col(g));
+			score_gradient[g] += xCJg * factor;
 		}
 
 		//hessian
-		for(int g = 0; g<3; g++) {
-			for(int h = 0; h<3; h++) {
-				double xCJg =  eMappedPoint.transpose() * eCovInv * eJacobian.col(g);
-				double xCJh =  eMappedPoint.transpose() * eCovInv * eJacobian.col(h);
-				Eigen::Vector2d secondDerivativeVec(0,0);
-				//use different values if g & h == 3
-				if(g == 2 && h == 2) {
-					secondDerivativeVec(0) = - _sceneTmp[j][0] * cos(angleZ) + _sceneTmp[j][1] * cos(angleZ);
-					secondDerivativeVec(1) = - _sceneTmp[j][0] * sin(angleZ) - _sceneTmp[j][1] * cos(angleZ);
+		for (int g = 0; g < 3; g++) {
+			for (int h = 0; h < 3; h++) {
+				Eigen::Vector2d secondDerivativeVec(0, 0);
+				//use different values if g & h == 2
+				if (g == 2 && h == 2) {
+					secondDerivativeVec(0) = -_sceneTmp[j][0] * cos(angleZ)
+							+ _sceneTmp[j][1] * cos(angleZ);
+					secondDerivativeVec(1) = -_sceneTmp[j][0] * sin(angleZ)
+							- _sceneTmp[j][1] * cos(angleZ);
 				}
-				double xCSec =  eMappedPoint.transpose() * eCovInv * secondDerivativeVec;
-				double JhCJg = eJacobian.col(h) * eCovInv * eJacobian.col(g);
-				hessian(g,h) += factor * ( xCJg * -xCJh) + xCSec + JhCJg;
+				double xCJg = eMappedPoint.transpose() * eCovInv
+						* eJacobian.col(g);
+				double xCJh = eMappedPoint.transpose() * eCovInv
+						* eJacobian.col(h);
+				double xCSec = eMappedPoint.transpose() * eCovInv
+						* secondDerivativeVec;
+				double JhCJg = eJacobian.col(h).transpose() * eCovInv
+						* eJacobian.col(g);
+				hessian(g, h) += factor * (xCJg * -xCJh) + xCSec + JhCJg;
 			}
 		}
-
-
-
-
 
 //		Fast code, not implemented yet
 //		//gradient
@@ -257,10 +274,14 @@ EnumState Ndt::step(Matrix &hessian, double* score_gradient, double &score) {
 //		hessian(0,1) += factor * (xInvC1 * -xInvC2  + 0 + *cov_inv(1,0) );
 //		hessian(0,2) += factor * (xInvC1 * -xInvCJ3 + 0 + *cov_inv() )
 	}
+
+	return PROCESSING;
 }
 
 EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
+
 	Registration::_Tfinal4x4->setIdentity();
+	unsigned int iter = 0;
 
 	if (Tinit) {
 		applyTransformation(_sceneTmp, _sizeScene, _dim, Tinit);
@@ -268,24 +289,82 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 	}
 
 	EnumState eRetval = PROCESSING;
-	unsigned int iter = 0;
-	//double rms_prev = 10e12;
-
-	for (unsigned int i = 0; i < Registration::_maxIterations; i++) {
+	while (eRetval == PROCESSING) {
+		cout << "Iteration: " << iter << endl;
+		//Reset iteration parameters
 		double score = 0;
-		double score_gradient[3] = { 0, 0, 0 };
-		Matrix* hessian = new Matrix(3, 3);
+		Eigen::Vector3d score_gradient = Eigen::Vector3d::Zero();
+		Eigen::Matrix3d hessian = Eigen::Matrix3d::Zero();
 
-		eRetval = step(*hessian, &score_gradient, score)
+		//calculate one iteration
+		eRetval = step(hessian, score_gradient, score);
 
+		//solve registration equation
+		//calculate the parameter vector(rotation, tx, tz)
+		Eigen::VectorXd deltaParam;
+		deltaParam = hessian.inverse() * -score_gradient;
+		Eigen::Matrix4d deltaTF = Eigen::Matrix4d::Zero();
+		composeTransformation(deltaTF, deltaParam(0), deltaParam(1),
+				deltaParam(2));
+
+		//apply the found transformation for this step
+		EigenMatrix4dToObviouslyMatrix(Registration::_Tlast, deltaTF);
+		//Matrix inverseTF = Registration::_Tlast->getInverse();
 		Registration::applyTransformation(_sceneTmp, _sizeScene, _dim,
 				Registration::_Tlast);
+
+		if (_trace) {
+			_trace->addAssignment(_sceneTmp, _sizeScene);
+		}
+		(*_Tfinal4x4) = (*_Tlast) * (*_Tfinal4x4);
 		iter++;
+
+		if (iter >= Registration::_maxIterations)
+			eRetval = MAXITERATIONS;
+
+		cout << "State: " << iter << endl;
+
 	}
 
 	*iterations = iter;
 
 	return eRetval;
+}
+
+void Ndt::EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
+		Eigen::Matrix4d eigenMat) {
+//Rotation
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			(*obviousMat)(i, j) = eigenMat(i, j);
+		}
+	}
+}
+
+void Ndt::composeTransformation(Eigen::Matrix4d& tf, double angle, double t_x,
+		double t_y) {
+	Eigen::AngleAxisd appliedRotation;
+	Eigen::Translation3d appliedTranslation;
+
+	appliedRotation = Eigen::AngleAxisd((M_PI / 180) * angle,
+			Eigen::Vector3d::UnitZ());
+	appliedTranslation = Eigen::Translation3d(t_x, t_y, 0);
+	tf = Eigen::Matrix4d((appliedTranslation * appliedRotation).matrix());
+
+}
+
+void Ndt::activateTrace() {
+	_trace = new NdtTrace(Registration::_dim);
+}
+
+void Ndt::deactivateTrace() {
+	delete _trace;
+	_trace = NULL;
+}
+
+void Ndt::serializeTrace(char* folder, unsigned int delay) {
+	if (_trace)
+		_trace->serialize(folder, delay);
 }
 
 }

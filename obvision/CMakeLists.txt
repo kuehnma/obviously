@@ -32,7 +32,9 @@ add_library(obvision
 	icp/Icp.cpp
 	icp/IcpTrace.cpp
 	icp/IcpMultiInitIterator.cpp
+  registration/Registration.cpp
 	ndt/Ndt.cpp
+	ndt/NdtTrace.cpp
 	ransacMatching/RansacMatching.cpp
 	normals/NormalsEstimator.cpp
 	mesh/TriangleMesh.cpp

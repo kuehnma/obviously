@@ -78,11 +78,11 @@ int main(int argc, char** argv)
   IRigidEstimator* estimator     = (IRigidEstimator*) new PointToLine2DEstimator();
 
   Icp* icp = new Icp(assigner, estimator);
+  icp->activateTrace();
   icp->setModel(M, N);
   icp->setScene(&S, NULL);
   icp->setMaxRMS(0.0);
   icp->setMaxIterations(iterations);
-  icp->activateTrace();
 
   double rms;
   unsigned int pairs;

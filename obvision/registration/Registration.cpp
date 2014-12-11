@@ -4,11 +4,12 @@
  *  Created on: 08.12.2014
  *      Author: Markus Kühn
  */
-#include "Registration.h"
 
+#include "Registration.h"
 #include "obcore/base/tools.h"
 #include "obcore/base/Timer.h"
 #include "obcore/math/mathbase.h"
+
 
 namespace obvious {
 
@@ -20,11 +21,6 @@ const char* Registration::state2char(EnumState eState) {
 }
 ;
 
-virtual void Registration::reset() {
-	_Tfinal4x4->setIdentity();
-	if (_sceneTmp)
-		System<double>::copy(_sizeScene, _dim, _scene, _sceneTmp);
-}
 
 void Registration::setMaxIterations(unsigned int iterations)
 {
@@ -126,7 +122,7 @@ void Registration::checkMemory(unsigned int rows, unsigned int cols, unsigned in
   }
 }
 
-bool* createSubsamplingMask(unsigned int* size, double probability)
+bool* Registration::createSubsamplingMask(unsigned int* size, double probability)
 {
   unsigned int sizeOut = 0;
   bool* mask = new bool[*size];
@@ -146,6 +142,8 @@ bool* createSubsamplingMask(unsigned int* size, double probability)
   *size = sizeOut;
   return mask;
 }
+
+
 
 }
 

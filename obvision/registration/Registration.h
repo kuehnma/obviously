@@ -47,12 +47,12 @@ public:
 	 * @param estimator transformation estimator
 	 * @param pDistanceThreshold thresholding strategy
 	 */
-	Registration();
+	Registration(){};
 
 	/**
 	 * Destructor
 	 */
-	virtual ~Registration() = 0;
+	virtual ~Registration(){};
 
 	/**
 	 * convert enumeration to char*
@@ -68,7 +68,7 @@ public:
 	 * @param size number of points, i.e. coordinate triples
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	virtual void setModel(double* coords, const unsigned int size, double probability = 1.0) = 0;
+//	virtual void setModel(double* coords, const unsigned int size, double probability = 1.0) = 0;
 
 	/**
 	 * Convenience method extracting all points from cloud to double array
@@ -76,7 +76,7 @@ public:
 	 * @param normals model normals, may be NULL
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
+virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
 
 	/**
 	 * Copy scene to internal buffer
@@ -85,7 +85,7 @@ public:
 	 * @param size number of points, i.e. coordinate triples
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	virtual void setScene(double* coords, const unsigned int size, double probability = 1.0) = 0;
+//	virtual void setScene(double* coords, const unsigned int size, double probability = 1.0) = 0;
 
 	/**
 	 * Convenience method extracting data from cloud to double array
@@ -100,6 +100,11 @@ public:
 	 */
 	virtual void reset() = 0;
 
+	virtual void activateTrace() = 0;
+
+	virtual void serializeTrace(char* folder, unsigned int delay) = 0;
+
+
 	/**
 	 * Set maximum number of iteration steps
 	 * @param iterations maximum number of iteration steps
@@ -112,13 +117,13 @@ public:
 	 */
 	unsigned int getMaxIterations();
 
-	/**
-	 * Perform one iteration
-	 * @param rms return value of RMS error
-	 * @param pairs return value of pair assignments, i.e. number of pairs
-	 * @return processing state
-	 */
-	virtual EnumState step() = 0;
+//	/**
+//	 * Perform one iteration
+//	 * @param rms return value of RMS error
+//	 * @param pairs return value of pair assignments, i.e. number of pairs
+//	 * @return processing state
+//	 */
+//	virtual EnumState step() = 0;
 
 	/**
 	 * Start iteration
@@ -128,7 +133,7 @@ public:
 	 * @param Tinit apply initial transformation before iteration
 	 * @return  processing state
 	 */
-	virtual EnumState iterate() = 0;
+	virtual EnumState iterate(double* rms, unsigned int* iterations, Matrix* Tinit=NULL) = 0;
 
 	/**
 	 * Get final 4x4 rotation matrix determined through iteration
@@ -150,6 +155,7 @@ public:
 
 protected:
 
+
 	/**
 	 * apply transformation to data array
 	 * @param data 2D or 3D coordinates
@@ -169,7 +175,7 @@ protected:
 	void checkMemory(unsigned int rows, unsigned int cols,
 			unsigned int &memsize, double** &mem);
 
-	bool* createSubsamplingMask(unsigned int* size, double probability);
+	static bool* createSubsamplingMask(unsigned int* size, double probability);
 
 
 	/**
