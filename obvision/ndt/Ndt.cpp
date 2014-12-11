@@ -197,8 +197,9 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		// likelihood
 		double l = c_zm(0) * tmp(0) + c_zm(1) * tmp(1);
 		//score
-		double px = exp(-0.5 * l);
+		double px = exp(-0.1 * l);
 		score -= px;
+		cout<<"likelihood "<<l<<"\n point score "<< px <<"\n Vector  tmp "<<tmp(0)<<" "<<tmp(1)<<endl;
 
 		//fixme known inconsistency because of obviously->eigen conversion
 		Eigen::Vector2d eMappedPoint(c_zm(0), c_zm(1));
@@ -222,10 +223,13 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 				- _sceneTmp[j][1] * sin(angleZ);
 
 		//gradient
-		double factor = exp(-0.5 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
+		//cout<<"point "<<eMappedPoint<<"\n Cov"<<eCovInv.matrix() <<"\n jacobi "<<eJacobian.matrix()<<endl;
+		double factor = exp(-0.1 * (c_zm(0) * tmp(0) + c_zm(1) * tmp(1)));
+		cout<<"Factor: "<<factor<<endl;
 		for (int g = 0; g < 3; g++) {
 			double xCJg =
 					(eMappedPoint.transpose() * eCovInv * eJacobian.col(g));
+			//cout<< "xCJg "<<xCJg<<endl;
 			score_gradient[g] += xCJg * factor;
 		}
 
@@ -299,6 +303,7 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 		//calculate one iteration
 		eRetval = step(hessian, score_gradient, score);
 
+		cout<<"Score: "<<score<<"\n hessian: "<<hessian.matrix()<<"\n gradient "<< score_gradient<<endl;
 		//solve registration equation
 		//calculate the parameter vector(rotation, tx, tz)
 		Eigen::VectorXd deltaParam;

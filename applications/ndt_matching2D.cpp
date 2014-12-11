@@ -18,12 +18,12 @@ using namespace obvious;
 
 int main(int argc, char** argv) {
 	// Model coordinates
-	obvious::Matrix* M = new obvious::Matrix(1000, 2);
+	obvious::Matrix* M = new obvious::Matrix(100, 2);
 
-	for (int i = 0; i < 200; i++) {
+	for (int i = 0; i < 100; i++) {
 		double di = (double) i;
-		(*M)(i, 0) = sin(di / 100.0);
-		(*M)(i, 1) = sin(di / 20.0);
+		(*M)(i, 0) = i / 11; //sin(di / 100.0);
+		(*M)(i, 1) = i / 11; //sin(di / 20.0);
 	}
 
 	obvious::Matrix T = MatrixFactory::TransformationMatrix33(deg2rad(4.0), 0.2,
