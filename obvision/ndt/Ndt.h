@@ -24,7 +24,7 @@ struct NdtCell {
 	Matrix* cov;
 	Matrix* cov_inv;
 	bool isOccupied() {
-		return (coords.size() >= 4);
+		return (coords.size() >= 3);
 	}
 	;
 };
