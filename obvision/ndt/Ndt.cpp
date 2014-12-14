@@ -166,6 +166,65 @@ void Ndt::reset() {
 		System<double>::copy(_sizeScene, _dim, _scene, _sceneTmp);
 }
 
+NdtCell Ndt::getCorrespondingCell(double pointX, double pointY) {
+	int x = floor((pointX - _minX) / _cellSize);
+	int y = floor((pointY - _minY) / _cellSize);
+	if (x < 0 || x > _numCellsY || y < 0 || y > _numCellsY) {
+		assert(false);
+	}
+
+	/** get information from related cell**/
+	NdtCell cell = _model[y][x];
+	return _model[y][x];
+}
+
+double Ndt::calculateScore(double** scene, Eigen::Vector3d &poseIncrement) {
+
+	Eigen::Matrix4d tf = Eigen::Matrix4d::Zero();
+	composeTransformation(tf, poseIncrement(2), poseIncrement(0),
+			poseIncrement(1));
+	Matrix* obTF = new Matrix(4, 4);
+	EigenMatrix4dToObviouslyMatrix(obTF, tf);
+	Registration::applyTransformation(scene, _sizeScene, _dim, obTF);
+
+	double score;
+	double c1, c2, d3, d1, d2;
+	double integral, outlier_ratio, support_size;
+	integral = 0.1;
+	outlier_ratio = 0.35;
+	support_size = 1.0; //=current resolution
+	c1 = (1 - outlier_ratio) / integral;
+	c2 = outlier_ratio / pow(support_size, 3);
+	d3 = -log(c2);
+	d1 = -(-log(c1 + c2) - d3);
+	d2 = -log((-log(c1 * exp(-0.5) + c2) - d3) / -d1);
+
+	for (unsigned int j = 0; j < _sizeScene; j++) {
+		/** project transformed scene point to cell **/
+		NdtCell cell = getCorrespondingCell(scene[j][0], scene[j][1]);
+		if (!cell.isOccupied())
+			continue; //Jump is there are not enough points in the cell or no cell was found //fixme use neighbors
+
+		//fixme known inconsistency because of obviously->eigen conversion
+		Matrix *cov_inv = new Matrix(*cell.cov_inv);
+		Eigen::Vector2d eMappedPoint = Eigen::Vector2d::Zero(); //relative point to cell centroid
+		eMappedPoint(0) = scene[j][0] - cell.centroid[0];
+		eMappedPoint(1) = scene[j][1] - cell.centroid[1];
+		Eigen::Matrix2d eCovInv = Eigen::Matrix2d::Zero();
+		eCovInv(0, 0) = (*cov_inv)(0, 0);
+		eCovInv(0, 1) = (*cov_inv)(0, 1);
+		eCovInv(1, 0) = (*cov_inv)(1, 0);
+		eCovInv(1, 1) = (*cov_inv)(1, 1);
+
+		/** Calcuate Point Score **/
+		double l = eMappedPoint.transpose() * eCovInv * eMappedPoint; //likelyhood
+		double px = -d1 * exp(-d2 * 0.5 * l);  //point score
+		score -= px; //overall score
+
+	}
+	return score;
+}
+
 EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		double &score) {
 
@@ -202,13 +261,14 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		NdtCell cell = _model[y][x];
 		if (!cell.isOccupied())
 			continue; //Jump is there are not enough points in the cell //fixme use neighbors
-		retState = PROCESSING; 	//necessary to known if there was even one iteration through the code
+		retState = PROCESSING; //necessary to known if there was even one iteration through the code
 
 		//fixme known inconsistency because of obviously->eigen conversion
 		Matrix *cov_inv = new Matrix(*cell.cov_inv);
-		Eigen::Vector2d eTransformedPt(transformedScene[j][0], transformedScene[j][1]);
+		Eigen::Vector2d eTransformedPt(transformedScene[j][0],
+				transformedScene[j][1]);
 		Eigen::Vector2d eMappedPoint = Eigen::Vector2d::Zero(); //relative point to cell centroid
-		eMappedPoint(0) = eTransformedPt(0)- cell.centroid[0];
+		eMappedPoint(0) = eTransformedPt(0) - cell.centroid[0];
 		eMappedPoint(1) = eTransformedPt(1) - cell.centroid[1];
 		Eigen::Matrix2d eCovInv = Eigen::Matrix2d::Zero();
 		eCovInv(0, 0) = (*cov_inv)(0, 0);
@@ -218,25 +278,29 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 
 		/** Calcuate Point Score **/
 		double l = eMappedPoint.transpose() * eCovInv * eMappedPoint; //likelyhood
-		double px = -d1 * exp(-d2 * 0.5 * l);  //point score
+		double px = -d1 * exp(-d2 * 0.5 * l); //point score
 		score -= px; //overall score
 		//cout<<"likelihood "<<l<<"\n point score "<< px<<endl;
 
 		/** Jacobian **/
 		double angleZ = atan2((*Registration::_Tfinal4x4)(1, 0),
-						(*Registration::_Tfinal4x4)(0, 0));
+				(*Registration::_Tfinal4x4)(0, 0));
 		Eigen::MatrixXd eJacobian = Eigen::MatrixXd::Zero(2, 3);
 		eJacobian(0, 0) = 1;		//first column
 		eJacobian(1, 0) = 0;
 		eJacobian(0, 1) = 0;		//second column
 		eJacobian(1, 1) = 1;
-		eJacobian(0, 2) = -eTransformedPt(0) * sin(angleZ) - eTransformedPt(1) * cos(angleZ);
-		eJacobian(1, 2) = eTransformedPt(0) * cos(angleZ)	- eTransformedPt(1) * sin(angleZ);
-
+		eJacobian(0, 2) = -eTransformedPt(0) * sin(angleZ)
+				- eTransformedPt(1) * cos(angleZ);
+		eJacobian(1, 2) = eTransformedPt(0) * cos(angleZ)
+				- eTransformedPt(1) * sin(angleZ);
 
 		/** Score Gradient **/
 		//cout<<"point "<<eMappedPoint<<"\n Cov"<<eCovInv.matrix() <<"\n jacobi "<<eJacobian.matrix()<<endl;
-		double factor = exp(-d2 * 0.5 * (double) (eMappedPoint.transpose() * eCovInv * eMappedPoint));
+		double factor = exp(
+				-d2 * 0.5
+						* (double) (eMappedPoint.transpose() * eCovInv
+								* eMappedPoint));
 		for (int g = 0; g < 3; g++) {
 			double xCJg = eMappedPoint.transpose() * eCovInv * eJacobian.col(g);
 			score_gradient[g] += d1 * d2 * xCJg * factor;
@@ -248,14 +312,21 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 				Eigen::Vector2d secondDerivativeVec(0, 0);
 				//use different values if g & h == 2
 				if (g == 2 && h == 2) {
-					secondDerivativeVec(0) = -eTransformedPt(0) * cos(angleZ)	+ eTransformedPt(0) * sin(angleZ);
-					secondDerivativeVec(1) = -eTransformedPt(0) * sin(angleZ)	- eTransformedPt(0) * cos(angleZ);
+					secondDerivativeVec(0) = -eTransformedPt(0) * cos(angleZ)
+							+ eTransformedPt(0) * sin(angleZ);
+					secondDerivativeVec(1) = -eTransformedPt(0) * sin(angleZ)
+							- eTransformedPt(0) * cos(angleZ);
 				}
-				double xCJg = eMappedPoint.transpose() * eCovInv * eJacobian.col(g);
-				double xCJh = eMappedPoint.transpose() * eCovInv * eJacobian.col(h);
-				double xCSec = eMappedPoint.transpose() * eCovInv * secondDerivativeVec;
-				double JhCJg = eJacobian.col(h).transpose() * eCovInv * eJacobian.col(g);
-				hessian(g, h) += d1 * d2 * factor * (-d2 * xCJg * xCJh) + xCSec + JhCJg;
+				double xCJg = eMappedPoint.transpose() * eCovInv
+						* eJacobian.col(g);
+				double xCJh = eMappedPoint.transpose() * eCovInv
+						* eJacobian.col(h);
+				double xCSec = eMappedPoint.transpose() * eCovInv
+						* secondDerivativeVec;
+				double JhCJg = eJacobian.col(h).transpose() * eCovInv
+						* eJacobian.col(g);
+				hessian(g, h) += d1 * d2 * factor * (-d2 * xCJg * xCJh) + xCSec
+						+ JhCJg;
 			}
 
 		}
@@ -285,10 +356,9 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 		if (eRetval == NOTMATCHABLE) {
 			cout << "ERROR: There were no points in occupied cells" << endl;
 			break;
-		}
-		else if(score == 0) {
-			cout << "ERROR:Score is zero"<<endl;
-			eRetval= ERROR;
+		} else if (score == 0) {
+			cout << "ERROR:Score is zero" << endl;
+			eRetval = ERROR;
 			break;
 		}
 
@@ -296,8 +366,8 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 		Eigen::Vector3d deltaParam;
 		deltaParam = hessian.fullPivLu().solve(-score_gradient);
 		//deltaParam = hessian.inverse() * -score_gradient;
-		deltaParam.normalize();	 //fixeme determine a stepsize here e.g. with More & Thuente line search
-		deltaParam *= 0.10;
+		deltaParam.normalize();	//fixeme determine a stepsize here e.g. with More & Thuente line search
+		deltaParam *= lineSearch(score_gradient, deltaParam, score);
 		cout << "Iteration finished with:\nScore: " << score << "\n Hessian: "
 				<< hessian.matrix() << "\n gradient " << score_gradient
 				<< "\n Delta Param: " << deltaParam << "\n\n\n" << endl;
@@ -312,14 +382,11 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 		Registration::applyTransformation(_sceneTmp, _sizeScene, _dim,
 				Registration::_Tlast);
 
-
 		(*_Tfinal4x4) = (*_Tlast) * (*_Tfinal4x4);
 		iter++;
 
-
 		if (iter >= Registration::_maxIterations)
 			eRetval = MAXITERATIONS;
-
 
 		if (_trace) {
 			_trace->addAssignment(_sceneTmp, _sizeScene);
@@ -366,3 +433,46 @@ void Ndt::serializeTrace(char* folder, unsigned int delay) {
 }
 
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// LINE SEARCH Backtracking
+////////////////////////////////////////////////////////////////////////////////////////////////
+double Ndt::lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit) {
+
+	double stepSizeMax = 4;
+	double stepSize = stepSizeMax;
+	double shrinkF = 0.5; //T
+	double controlF = 0.5; //c
+	double m = poseIncrement.dot(gradientInit);
+
+
+	double t = -shrinkF * m;
+
+	//from magnusson code
+//	if(m >= 0.0) {
+//		poseIncrement = -poseIncrement;
+//		m = -m;
+//		if (m >= 0.0){return 0.05;} //recovery step
+//	}
+
+	if (_searchTmp)
+		System<double>::deallocate(_searchTmp);
+	System<double>::allocate(_sizeScene, _dim, _searchTmp);
+
+	int iter = 0;
+	double scoreInc = 0;
+	while ((scoreInit - scoreInc) < (stepSize*t)) { //Armijo–Goldstein condition
+		stepSize *= shrinkF;
+
+		Eigen::Vector3d reducedIncrement = poseIncrement * stepSize;
+		//calculate score for f(x + steSize * poseInc)
+		System<double>::copy(_sizeScene, _dim, _sceneTmp, _searchTmp);
+		scoreInc = calculateScore(_searchTmp, reducedIncrement);
+		cout<<"ScoreInc "<< scoreInc<<endl;
+		iter++;
+	}
+
+	cout<<"Stepsize: "<<stepSize<<endl;
+	return stepSize;
+}
+

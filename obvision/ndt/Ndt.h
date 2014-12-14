@@ -120,6 +120,26 @@ private:
 	 */
 	static void EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
 			Eigen::Matrix4d eigenMat);
+	/**
+	 * caculate score for a given parametervektor offset and scene
+	 * Used for line search
+	 */
+
+	/**
+	 * Finds a Corresponding cell for coordinats x,y
+	 * @param pointX X coordinate of a point
+	 * @param pointY Y coordinate of a point
+	 * @return A corresponding cell or NULL for nothing
+	 */
+	NdtCell getCorrespondingCell(double pointX, double pointY);
+
+
+	double calculateScore(double** scene, Eigen::Vector3d &poseIncrement);
+
+	/**
+	 * Search for a good stepsize with backtracking
+	 */
+	double lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit);
 
 	int _minX;
 	int _maxX;
@@ -167,6 +187,9 @@ private:
 	 * Trace instance for debugging
 	 */
 	NdtTrace* _trace;
+
+	double** _searchTmp;
+
 
 };
 
