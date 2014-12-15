@@ -30,18 +30,17 @@ int main(int argc, char** argv) {
 //		(*M)(i, 1) = sin(di / 10.0);
 //	}
 
-	obvious::Matrix T = MatrixFactory::TransformationMatrix33(deg2rad(9.0), 0.3,
-			0.4);
+	obvious::Matrix T = MatrixFactory::TransformationMatrix33(deg2rad(9.0), -0.3,
+			-0.4);
 	obvious::Matrix S = M->createTransform(T);
 	cout<<"testfield:"<<S(10,1)<<endl;
 
 	//fixme dynamic boarder computation
-	Registration* ndt = new Ndt(-10, 10, -10, 10, 0.5);
+	Registration* ndt = new Ndt(-20, 20, -20, 20, 0.4);
 	ndt->activateTrace();
 	ndt->setModel(M);
 	ndt->setScene(&S);
-	ndt->setMaxIterations(10);
-
+	ndt->setMaxIterations(35);
 	double rms;
 	unsigned int it;
 	EnumState state = ndt->iterate(&rms, &it);

@@ -24,7 +24,7 @@ struct NdtCell {
 	Matrix* cov;
 	Matrix* cov_inv;
 	bool isOccupied() {
-		return (coords.size() >= 4);
+		return (coords.size() >= 3);
 	}
 	;
 };
@@ -83,35 +83,31 @@ public:
 	 * @return  processing state
 	 */
 	EnumState iterate(double* rms, unsigned int* iterations, Matrix* Tinit =
-			NULL);
+	NULL);
 
+	/**
+	 * Activate internal trace writing. While the method iterate is executed, all states are traced.
+	 */
+	void activateTrace();
 
+	/**
+	 * Deactivate internal trace writing.
+	 */
+	void deactivateTrace();
 
-	  /**
-	   * Activate internal trace writing. While the method iterate is executed, all states are traced.
-	   */
-	  void activateTrace();
-
-	  /**
-	   * Deactivate internal trace writing.
-	   */
-	  void deactivateTrace();
-
-
-	  /**
-	   * Serialize assignment to trace folder
-	   * @param folder trace folder (must not be existent)
-	   * @param delay animation delay (specified in delay*1/100s)
-	   */
-	  void serializeTrace(char* folder, unsigned int delay=10);
-
-
+	/**
+	 * Serialize assignment to trace folder
+	 * @param folder trace folder (must not be existent)
+	 * @param delay animation delay (specified in delay*1/100s)
+	 */
+	void serializeTrace(char* folder, unsigned int delay = 10);
 
 private:
 
 	/**
-	 * Compose a Transformation  from angleZ translationX & translationY as an Eigen Matrix
-	 * @param tf The transformation matrix as an in/out parameter
+	 * Compose a 2D Transformation in a 4x4 Matrix.
+	 * The Matrix is composed by the Rotation around the Z - and X,Y translation
+	 * @param tf Empty Eigen Matrix 4d as an in/out parameter
 	 * @param angle The rotation around the Z-Axis
 	 * @param t_x The translation in x-direction
 	 * @param t_y The translation in y-direction
@@ -122,16 +118,38 @@ private:
 	/**
 	 * Convert between different Matrix Classes
 	 */
-	static void EigenMatrix4dToObviouslyMatrix(
-			obvious::Matrix* obviousMat, Eigen::Matrix4d eigenMat);
+	static void EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
+			Eigen::Matrix4d eigenMat);
+	/**
+	 * caculate score for a given parametervektor offset and scene
+	 * Used for line search
+	 */
+
+	/**
+	 * Finds a Corresponding cell for coordinats x,y
+	 * @param pointX X coordinate of a point
+	 * @param pointY Y coordinate of a point
+	 * @return A corresponding cell or NULL for nothing
+	 */
+	NdtCell getCorrespondingCell(double pointX, double pointY);
+
+
+	double calculateScore(double** scene, Eigen::Vector3d &poseIncrement);
+
+	/**
+	 * Search for a good stepsize with backtracking
+	 */
+	double lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit);
 
 	int _minX;
 	int _maxX;
 	int _minY;
 	int _maxY;
+
+	/**
+	 * Size of a squared cell. (cellSize * cellSize)
+	 */
 	double _cellSize;
-	int _numCellsX;
-	int _numCellsY;
 
 	/**
 	 * size of internal scene buffer
@@ -139,6 +157,16 @@ private:
 	unsigned int _sizeSceneBuf;
 
 	NdtCell** _model;
+
+	/**
+	 * Number of columns in the model
+	 */
+	int _numCellsX;
+
+	/**
+	 * Number of rows in the model
+	 */
+	int _numCellsY;
 
 	/**
 	 * the scene
@@ -158,7 +186,9 @@ private:
 	/**
 	 * Trace instance for debugging
 	 */
-    NdtTrace* _trace;
+	NdtTrace* _trace;
+
+	double** _searchTmp;
 
 
 };
