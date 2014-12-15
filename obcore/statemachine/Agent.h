@@ -96,7 +96,6 @@ public:
    */
   void getPosition(double& x, double& y, double& z);
 
-
   /**
    * Set orientation of robot around z-axis (psi and theta will be set to 0)
    * @param phi
@@ -133,16 +132,16 @@ public:
   void clearPath();
 
   /**
-   * Set target
-   * @param path
+   * Add target
+   * @param target target
    */
-//  void setTarget(std::vector<obvious::Point2D> target);
-//
-//  /**
-//   * Get targets
-//   * @param path
-//   */
-//  void getTargets(std::vector<obvious::Point2D>& targets);
+  void addTarget(obvious::Point2D target);
+
+  /**
+   * Get target
+   * @return target
+   */
+  bool getNextTarget(obvious::Point2D& target);
 
 private:
 
