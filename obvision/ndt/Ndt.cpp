@@ -26,10 +26,12 @@ Ndt::Ndt(int minX, int maxX, int minY, int maxY, double cellSize) :
 		}
 	}
 
+	//Initialize Members;
 	Registration::_maxIterations = 3;
 	Registration::_dim = 2;
 	_scene = NULL;
 	_sceneTmp = NULL;
+	_searchTmp = NULL;
 	_sizeSceneBuf = 0;
 	_sizeScene = 0;
 
@@ -79,7 +81,7 @@ void Ndt::setModel(Matrix* coords, double probability) {
 		}
 	}
 
-	//Iterate cells and  calculate covariance and centroid if a cell is occupied
+	//Iterate cells and  calculate covariance and centroid if a cell is occupied Eq. 6.2 & 6.3 (Magnusson,2009)
 	for (int y = 0; y < _numCellsY; y++) {
 		for (int x = 0; x < _numCellsX; x++) {
 			NdtCell cell = _model[y][x];
@@ -178,6 +180,7 @@ NdtCell Ndt::getCorrespondingCell(double pointX, double pointY) {
 	return _model[y][x];
 }
 
+//only used for lineSearch!!!!!!!!
 double Ndt::calculateScore(double** scene, Eigen::Vector3d &poseIncrement) {
 
 	Eigen::Matrix4d tf = Eigen::Matrix4d::Zero();
@@ -236,6 +239,7 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 
 	//NOTE: SceneTMP already contains the transformed points according to the latest transformation parameters
 
+	//Parameterization of score function; Eq. 6.8 (Magnusson,2009)
 	double c1, c2, d3, d1, d2;
 	double integral, outlier_ratio, support_size;
 	integral = 0.1;
@@ -276,13 +280,13 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		eCovInv(1, 0) = (*cov_inv)(1, 0);
 		eCovInv(1, 1) = (*cov_inv)(1, 1);
 
-		/** Calcuate Point Score **/
+		/** Calcuate Point Score Eq. 6.9 & 6.10 (Magnusson,2009)**/
 		double l = eMappedPoint.transpose() * eCovInv * eMappedPoint; //likelyhood
 		double px = -d1 * exp(-d2 * 0.5 * l); //point score
 		score -= px; //overall score
 		//cout<<"likelihood "<<l<<"\n point score "<< px<<endl;
 
-		/** Jacobian **/
+		/** Jacobian 2D NDT Eq. 6.15 (Magnusson,2009)**/
 		double angleZ = atan2((*Registration::_Tfinal4x4)(1, 0),
 				(*Registration::_Tfinal4x4)(0, 0));
 		Eigen::MatrixXd eJacobian = Eigen::MatrixXd::Zero(2, 3);
@@ -295,7 +299,7 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 		eJacobian(1, 2) = eTransformedPt(0) * cos(angleZ)
 				- eTransformedPt(1) * sin(angleZ);
 
-		/** Score Gradient **/
+		/** Score Gradient Eq. 6.12 (Magnusson,2009)**/
 		//cout<<"point "<<eMappedPoint<<"\n Cov"<<eCovInv.matrix() <<"\n jacobi "<<eJacobian.matrix()<<endl;
 		double factor = exp(
 				-d2 * 0.5
@@ -306,11 +310,12 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 			score_gradient[g] += d1 * d2 * xCJg * factor;
 		}
 
-		/** Hessian Caculation **/
+		/** Hessian Caculation Eq. 6.13 (Magnusson,2009) **/
 		for (int g = 0; g < 3; g++) {
 			for (int h = 0; h < 3; h++) {
+				//second order partial derivatives Eq. 6.8 (Magnusson,2009)
+				// use different values if g & h == 2
 				Eigen::Vector2d secondDerivativeVec(0, 0);
-				//use different values if g & h == 2
 				if (g == 2 && h == 2) {
 					secondDerivativeVec(0) = -eTransformedPt(0) * cos(angleZ)
 							+ eTransformedPt(0) * sin(angleZ);
@@ -362,12 +367,17 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 			break;
 		}
 
-		/**Solve registration equation**/
+		/**Solve registration equation Hessian * deltaParam = - gradient **/
 		Eigen::Vector3d deltaParam;
-		deltaParam = hessian.fullPivLu().solve(-score_gradient);
 		//deltaParam = hessian.inverse() * -score_gradient;
+		deltaParam = hessian.fullPivLu().solve(-score_gradient);
 		deltaParam.normalize();	//fixeme determine a stepsize here e.g. with More & Thuente line search
-		deltaParam *= lineSearch(score_gradient, deltaParam, score);
+// 		//Line Search
+//		double lineSearchResult = lineSearch(score_gradient, deltaParam, score);
+//		cout<<"Line Search"<<lineSearchResult<<endl;
+//		deltaParam *= lineSearchResult;
+
+		deltaParam *= 0.1; //todo use line search here e.g. More & Thuente, 1992
 		cout << "Iteration finished with:\nScore: " << score << "\n Hessian: "
 				<< hessian.matrix() << "\n gradient " << score_gradient
 				<< "\n Delta Param: " << deltaParam << "\n\n\n" << endl;
@@ -411,8 +421,7 @@ void Ndt::composeTransformation(Eigen::Matrix4d& tf, double angle, double t_x,
 	Eigen::AngleAxisd appliedRotation;
 	Eigen::Translation3d appliedTranslation;
 
-	appliedRotation = Eigen::AngleAxisd((M_PI / 180) * angle,
-			Eigen::Vector3d::UnitZ());
+	appliedRotation = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
 	appliedTranslation = Eigen::Translation3d(t_x, t_y, 0);
 	tf = Eigen::Matrix4d((appliedTranslation * appliedRotation).matrix());
 
@@ -437,14 +446,14 @@ void Ndt::serializeTrace(char* folder, unsigned int delay) {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // LINE SEARCH Backtracking
 ////////////////////////////////////////////////////////////////////////////////////////////////
-double Ndt::lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit) {
+double Ndt::lineSearch(Eigen::Vector3d &gradientInit,
+		Eigen::Vector3d &poseIncrement, double scoreInit) {
 
-	double stepSizeMax = 4;
+	double stepSizeMax = 0.5;
 	double stepSize = stepSizeMax;
 	double shrinkF = 0.5; //T
 	double controlF = 0.5; //c
-	double m = poseIncrement.dot(gradientInit);
-
+	double m = poseIncrement.transpose() * gradientInit;
 
 	double t = -shrinkF * m;
 
@@ -461,18 +470,27 @@ double Ndt::lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncre
 
 	int iter = 0;
 	double scoreInc = 0;
-	while ((scoreInit - scoreInc) < (stepSize*t)) { //Armijo–Goldstein condition
-		stepSize *= shrinkF;
+	while ((scoreInit - scoreInc) < (stepSize * t)) { //Armijo–Goldstein condition
+		stepSize *= controlF;
 
 		Eigen::Vector3d reducedIncrement = poseIncrement * stepSize;
 		//calculate score for f(x + steSize * poseInc)
 		System<double>::copy(_sizeScene, _dim, _sceneTmp, _searchTmp);
 		scoreInc = calculateScore(_searchTmp, reducedIncrement);
-		cout<<"ScoreInc "<< scoreInc<<endl;
+
+		double test1 = scoreInit - scoreInc;
+		double test2 = stepSize * t;
+
+		if (test2 == 0) {
+			cout << "Recovery" << endl; //recovery step
+			return 0.05;
+		}
+
+		//cout<<"StepSizeIT "<<stepSize<<"\n t="<<t<< "\nfirst part "<<test1<<"\n second "<< test2 <<"\nScoreInc "<< scoreInc<<endl;
 		iter++;
 	}
 
-	cout<<"Stepsize: "<<stepSize<<endl;
+	//cout<<"Stepsize: "<<stepSize<<endl;
 	return stepSize;
 }
 

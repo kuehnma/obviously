@@ -1,3 +1,8 @@
+/**
+ * Implementation of the 2D NDT algorithm according to the dissertation by Magnusson (2009)
+ * Disseration: The three-dimensional normal-distributions transform: an efficient representation for registration, surface analysis, and loop detection, Magnusson, 2009
+ */
+
 #ifndef NDT_H_
 #define NDT_H_
 
@@ -117,30 +122,44 @@ private:
 
 	/**
 	 * Convert between different Matrix Classes
+	 * This method is used to transform a Transformation as Eigen Matrix into a 4x4 obviously Representation.
+	 * @param obviousMat Output. Pointer to an obviously Matrix(4,4).
+	 * @param eigenMat Input. Eigen Matrix4d.
 	 */
 	static void EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
 			Eigen::Matrix4d eigenMat);
-	/**
-	 * caculate score for a given parametervektor offset and scene
-	 * Used for line search
-	 */
 
 	/**
 	 * Finds a Corresponding cell for coordinats x,y
+	 * This method doesn't prove for empty cells. It throws an assertion fail if a point is outside the cell structure.
 	 * @param pointX X coordinate of a point
 	 * @param pointY Y coordinate of a point
 	 * @return A corresponding cell or NULL for nothing
 	 */
 	NdtCell getCorrespondingCell(double pointX, double pointY);
 
-
+	/**
+	 * Calculate the score for a scene that is transformed by the parameter Vector
+	 * WARNING: Only used for line search algorithms yet. It assumes another transformation before the calculation of the score.
+	 * The input scene is changed within the method. Hence it might be necessary to ensure the actual member _scene is not changed by this.
+	 * @param scene The scene to be scored
+	 * @param poseIncrement The transformation parameters that are applied before score calculation
+	 * @return Score of the transformed scene
+	 */
 	double calculateScore(double** scene, Eigen::Vector3d &poseIncrement);
 
 	/**
 	 * Search for a good stepsize with backtracking
+	 * @param gradientInit The calculated gradient by the current iteration.
+	 * @param poseIncrement The delta of the parametervektor.
+	 * @param scoreInit The score from the current iteration.
+	 * @return Reasonable stepsize
 	 */
 	double lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit);
 
+	/**
+	 * Borders of the cellstructure
+	 */
 	int _minX;
 	int _maxX;
 	int _minY;

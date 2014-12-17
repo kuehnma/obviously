@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
 	cout<<"testfield:"<<S(10,1)<<endl;
 
 	//fixme dynamic boarder computation
-	Registration* ndt = new Ndt(-20, 20, -20, 20, 0.4);
+	Registration* ndt = new Ndt(-20, 20, -20, 20, 0.3);
 	ndt->activateTrace();
 	ndt->setModel(M);
 	ndt->setScene(&S);
