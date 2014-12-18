@@ -3,6 +3,7 @@
 
 #include <string>
 #include <list>
+#include <pthread.h>
 
 #include "obvision/planning/Obstacle.h"
 #include "obcore/base/Point.h"
@@ -37,6 +38,24 @@ public:
   ~AStarMap();
 
   /**
+   *
+   * @param map
+   */
+  void copyFrom(AStarMap* map);
+
+  /**
+   *
+   * @param map
+   */
+  void copyTo(AStarMap* map);
+
+  /**
+   *
+   * @param data
+   */
+  void setData(char* data);
+
+  /**
    * Get width of map
    * @return width
    */
@@ -67,6 +86,12 @@ public:
   void removeObstacle(Obstacle* obstacle);
 
   /**
+   *
+   * @param id
+   */
+  void removeObstacleById(int id);
+
+  /**
    * Remove all previously added obstacles
    */
   void removeAllObstacles();
@@ -88,7 +113,7 @@ public:
    * Get map with obstacles as occupied cells
    * @return map
    */
-  char** getMapWithObstacles();
+  void getMapWithObstacles(char** map);
 
   /**
    * Convert map to raw image
@@ -159,12 +184,6 @@ private:
 
   bool _mapIsDirty;
 
-  int** _closedNodesMap;
-
-  int** _openNodesMap;
-
-  int** _dirMap;
-
   obfloat _cellSize;
 
   unsigned int _cellsX;
@@ -172,6 +191,8 @@ private:
   unsigned int _cellsY;
 
   std::list<Obstacle> _obstacles;
+
+  pthread_mutex_t _mutex;
 };
 
 } /* namespace obvious */

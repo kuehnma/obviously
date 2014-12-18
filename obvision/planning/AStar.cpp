@@ -34,12 +34,13 @@ std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Point2D coordStar
 
 std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Pixel start, const Pixel target)
 {
-  static priority_queue<AStarNode> pq[2]; // list of open (not-yet-tried) MapNodes
-  static int pqi; // pq index
-  static AStarNode* n0;
-  static AStarNode* m0;
-  static unsigned int i, j, x, y;
-  static int xdx, ydy;
+  cout << __PRETTY_FUNCTION__ << endl;
+  priority_queue<AStarNode> pq[2]; // list of open (not-yet-tried) MapNodes
+  int pqi; // pq index
+  AStarNode* n0;
+  AStarNode* m0;
+  unsigned int i, j, x, y;
+  int xdx, ydy;
 
   int dx[8];
   int dy[8];
@@ -57,10 +58,48 @@ std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Pixel start, cons
 
   unsigned int height  = map->getHeight();
   unsigned int width   = map->getWidth();
-  char** buffer        = map->getMapWithObstacles();
-  int** closedNodesMap = map->_closedNodesMap;
-  int** openNodesMap   = map->_openNodesMap;
-  int** dirMap         = map->_dirMap;
+
+  char** buffer;
+  obvious::System<char>::allocate(height, width, buffer);
+  map->getMapWithObstacles(buffer);
+
+  // check if start is valid
+  if(start.u >= width || start.v>=height)
+  {
+    cout << "invalid u" << endl;
+    return std::vector<unsigned int>();
+  }
+  else
+  {
+    if(buffer[start.v][start.u]!=0)
+    {
+      cout << "invalid start" << endl;
+      return std::vector<unsigned int>();
+    }
+  }
+
+
+  // check if target is valid
+  if(target.u >= width || target.v>=height)
+  {
+    cout << "invalid v" << endl;
+    return std::vector<unsigned int>();
+  }
+  else
+  {
+    if(buffer[target.v][target.u]!=0)
+    {
+      cout << "invalid target" << endl;
+      return std::vector<unsigned int>();
+    }
+  }
+
+  int** closedNodesMap;
+  int** openNodesMap;
+  int** dirMap;
+  obvious::System<int>::allocate(height, width, closedNodesMap);
+  obvious::System<int>::allocate(height, width, openNodesMap);
+  obvious::System<int>::allocate(height, width, dirMap);
 
   // reset the Node maps
   for(y=0;y<height;y++)
@@ -69,6 +108,7 @@ std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Pixel start, cons
     {
       closedNodesMap[y][x] = 0;
       openNodesMap[y][x]   = 0;
+      dirMap[y][x]         = 0;
     }
   }
 
@@ -106,7 +146,10 @@ std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Pixel start, cons
         y+=dy[j];
       }
 
-      // garbage collection
+      obvious::System<int>::deallocate(closedNodesMap);
+      obvious::System<int>::deallocate(openNodesMap);
+      obvious::System<int>::deallocate(dirMap);
+      obvious::System<char>::deallocate(buffer);
       delete n0;
       // empty the leftover Nodes
       while(!pq[pqi].empty()) pq[pqi].pop();
@@ -160,11 +203,16 @@ std::vector<unsigned int> AStar::pathFind(AStarMap* map, const Pixel start, cons
           pqi=1-pqi;
           pq[pqi].push(*m0); // add the better Node instead
         }
-        else delete m0; // garbage collection
+        else delete m0;
       }
     }
-    delete n0; // garbage collection
+    delete n0;
   }
+
+  obvious::System<char>::deallocate(buffer);
+  obvious::System<int>::deallocate(closedNodesMap);
+  obvious::System<int>::deallocate(openNodesMap);
+  obvious::System<int>::deallocate(dirMap);
   return std::vector<unsigned int>(); // no route found
 }
 
