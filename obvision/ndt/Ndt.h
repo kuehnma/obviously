@@ -107,6 +107,15 @@ public:
 	 */
 	void serializeTrace(char* folder, unsigned int delay = 10);
 
+
+	/**
+	 * Abstract method implemented by derived classes for loading algorithm specific parameters
+	 * @param file Path to file.
+	 */
+	void loadParametersFromXML(string file);
+
+
+
 private:
 
 	/**
@@ -180,12 +189,12 @@ private:
 	/**
 	 * Number of columns in the model
 	 */
-	int _numCellsX;
+	unsigned int _numCellsX;
 
 	/**
 	 * Number of rows in the model
 	 */
-	int _numCellsY;
+	unsigned int _numCellsY;
 
 	/**
 	 * the scene

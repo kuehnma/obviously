@@ -37,6 +37,9 @@ int main(int argc, char** argv) {
 
 	//fixme dynamic boarder computation
 	Registration* ndt = new Ndt(-20, 20, -20, 20, 0.3);
+	ndt->loadParametersFromXML("/home/mkuehn/ndt.conf");
+	return 0;
+
 	ndt->activateTrace();
 	ndt->setModel(M);
 	ndt->setScene(&S);
@@ -64,3 +67,5 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
+
+

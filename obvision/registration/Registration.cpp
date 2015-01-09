@@ -19,7 +19,6 @@ const char* g_states[] = { "NDT_IDLE", "NDT_PROCESSING", "NDT_NOTMATCHABLE",
 const char* Registration::state2char(EnumState eState) {
 	return g_states[eState];
 }
-;
 
 
 void Registration::setMaxIterations(unsigned int iterations)

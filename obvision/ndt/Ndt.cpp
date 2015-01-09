@@ -4,6 +4,11 @@
 #include "obcore/base/Timer.h"
 #include "obcore/math/mathbase.h"
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#include <libxml++/libxml++.h>
+
 namespace obvious {
 
 Ndt::Ndt(int minX, int maxX, int minY, int maxY, double cellSize) :
@@ -237,9 +242,9 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 	Registration::applyTransformation(transformedScene, _sizeScene, _dim,
 			Registration::_Tfinal4x4);
 
-	//NOTE: SceneTMP already contains the transformed points according to the latest transformation parameters
+//NOTE: SceneTMP already contains the transformed points according to the latest transformation parameters
 
-	//Parameterization of score function; Eq. 6.8 (Magnusson,2009)
+//Parameterization of score function; Eq. 6.8 (Magnusson,2009)
 	double c1, c2, d3, d1, d2;
 	double integral, outlier_ratio, support_size;
 	integral = 0.1;
@@ -457,7 +462,7 @@ double Ndt::lineSearch(Eigen::Vector3d &gradientInit,
 
 	double t = -shrinkF * m;
 
-	//from magnusson code
+//from magnusson code
 //	if(m >= 0.0) {
 //		poseIncrement = -poseIncrement;
 //		m = -m;
@@ -490,7 +495,94 @@ double Ndt::lineSearch(Eigen::Vector3d &gradientInit,
 		iter++;
 	}
 
-	//cout<<"Stepsize: "<<stepSize<<endl;
+//cout<<"Stepsize: "<<stepSize<<endl;
 	return stepSize;
+}
+
+///////////////////////////////////////////////////////////////
+// XML Parser
+//////////////////////////////////////////////////////////////
+
+
+/**
+ * Abstract method implemented by derived classes for loading algorithm specific parameters
+ * @param file Path to file.
+ */
+
+void print_indentation(unsigned int indentation)
+{
+  for(unsigned int i = 0; i < indentation; ++i)
+    std::cout << " ";
+}
+
+void print_node(const xmlpp::Node* node, unsigned int indentation = 0)
+{
+  std::cout << std::endl; //Separate nodes by an empty line.
+
+  const xmlpp::ContentNode* nodeContent = dynamic_cast<const xmlpp::ContentNode*>(node);
+  const xmlpp::TextNode* nodeText = dynamic_cast<const xmlpp::TextNode*>(node);
+  const xmlpp::CommentNode* nodeComment = dynamic_cast<const xmlpp::CommentNode*>(node);
+
+  if(nodeText && nodeText->is_white_space()) //Let's ignore the indenting - you don't always want to do this.
+    return;
+
+  Glib::ustring nodename = node->get_name();
+
+  if(!nodeText && !nodeComment && !nodename.empty()) //Let's not say "name: text".
+  {
+    print_indentation(indentation);
+    std::cout << "Node name = " << node->get_name() << std::endl;
+    std::cout << "Node name = " << nodename << std::endl;
+  }
+
+
+  if(const xmlpp::Element* nodeElement = dynamic_cast<const xmlpp::Element*>(node))
+  {
+    //A normal Element node:
+
+    //line() works only for ElementNodes.
+    print_indentation(indentation);
+    std::cout << "     line = " << node->get_line() << std::endl;
+
+    //Print attributes:
+    const xmlpp::Element::AttributeList& attributes = nodeElement->get_attributes();
+    for(xmlpp::Element::AttributeList::const_iterator iter = attributes.begin(); iter != attributes.end(); ++iter)
+    {
+      const xmlpp::Attribute* attribute = *iter;
+      print_indentation(indentation);
+      std::cout << "  Attribute " << attribute->get_name() << " = " << attribute->get_value() << std::endl;
+    }
+
+    const xmlpp::Attribute* attribute = nodeElement->get_attribute("title");
+    if(attribute)
+    {
+      std::cout << "title found: =" << attribute->get_value() << std::endl;
+
+    }
+  }
+
+}
+
+void Ndt::loadParametersFromXML(string filepath) {
+
+  try
+	  {
+	    xmlpp::DomParser parser;
+	    parser.set_validate();
+	    parser.set_substitute_entities(); //We just want the text to be resolved/unescaped automatically.
+	    parser.parse_file(filepath);
+	    if(parser)
+	    {
+	      //Walk the tree:
+	      const xmlpp::Node* pNode = parser.get_document()->get_root_node(); //deleted by DomParser.
+	      print_node(pNode);
+	    }
+	  }
+	  catch(const std::exception& ex)
+	  {
+	    std::cout << "Exception caught: " << ex.what() << std::endl;
+	  }
+
+	  //return 0;
 }
 

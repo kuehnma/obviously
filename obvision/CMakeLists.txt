@@ -9,7 +9,9 @@ SET(OBVISION_VERSION_MAJOR 0)
 SET(OBVISION_VERSION_MINOR 1)
 
 INCLUDE_DIRECTORIES(..
-					/usr/include/eigen3)
+					/usr/include/eigen3
+					/usr/include/libxml++-2.6
+					/usr/include/glibmm-2.4)
 
 add_library(obvision
 	icp/assign/PairAssignment.cpp

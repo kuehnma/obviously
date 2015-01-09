@@ -95,6 +95,14 @@ virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
 	 */
 	virtual void setScene(Matrix* coords, double probability = 1.0) = 0;
 
+
+	/**
+	 * Abstract method implemented by derived classes for loading algorithm specific parameters
+	 * @param file Path to file.
+	 */
+	virtual void loadParametersFromXML(string filepath) = 0;
+
+
 	/**
 	 * Reset state of Registration algorithm (resets iteration count, estimated transformation and point pairs)
 	 */
