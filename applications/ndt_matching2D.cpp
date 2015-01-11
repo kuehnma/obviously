@@ -45,14 +45,10 @@ int main(int argc, char** argv) {
 	ndt->setScene(&S);
 	ndt->setMaxIterations(35);
 	double rms;
-	unsigned int it;
-	EnumState state = ndt->iterate(&rms, &it);
+	EnumState state = ndt->align();
 	obvious::Matrix F = ndt->getFinalTransformation();
 	F.invert();
-	cout << "NDT state: " << state << ", with " << it << " iterations): "
-			<< endl;
-
-	cout << "Iterations: " << it << endl;
+	cout << "NDT state: " << state << endl;
 
 	cout << "Applied transformation:" << endl;
 	T.print();

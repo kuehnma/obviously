@@ -8,13 +8,15 @@
 
 #include <iostream>
 #include <string.h>
+#include <fstream>
+#include <vector>
+#include <cstdlib>
 using namespace std;
 
 #include "obcore/base/CartesianCloud.h"
 #include "obcore/base/System.h"
 #include "obvision/registration/Registration.h"
 #include "obcore/math/linalg/linalg.h"
-#include "obvision/registration/Registration.h"
 #include <eigen3/Eigen/Dense>
 #include "obvision/ndt/NdtTrace.h"
 #include "obcore/base/CartesianCloud.h"
@@ -56,14 +58,14 @@ public:
 	 * @param coords model coordinates
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	void setModel(Matrix* coords, double probability = 1.0);
+	void setModel(Matrix* coords, Matrix* normals = NULL, double probability = 1.0);
 
 	/**
 	 * Copy scene to internal buffer
 	 * @param coords scene coordinates
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	void setScene(Matrix* coords, double probability = 1.0);
+	void setScene(Matrix* coords, Matrix* normals = NULL, double probability = 1.0);
 
 	/**
 	 * Reset state of NDT algorithm
@@ -87,8 +89,23 @@ public:
 	 * @param Tinit apply initial transformation before iteration
 	 * @return  processing state
 	 */
-	EnumState iterate(double* rms, unsigned int* iterations, Matrix* Tinit =
+	EnumState iterate(unsigned int* iterations, Matrix* Tinit =
 	NULL);
+
+	/**
+	 * Start registration process.
+	 * This method wraps the registration process for calls from a base class instance.
+	 * @param Tinit Initial transformation for the registration. (Initial Guess)
+	 * @return processing state
+	 */
+	EnumState align(Matrix* Tinit = NULL, bool verbose = false);
+
+	/**
+	 * Abstract method implemented by derived classes for loading algorithm specific parameters
+	 * @param file Path to file.
+	 * @return -1 if loading the parameters was not successful.
+	 */
+	int loadParametersFromXML(string filePath);
 
 	/**
 	 * Activate internal trace writing. While the method iterate is executed, all states are traced.
@@ -106,14 +123,6 @@ public:
 	 * @param delay animation delay (specified in delay*1/100s)
 	 */
 	void serializeTrace(char* folder, unsigned int delay = 10);
-
-
-	/**
-	 * Abstract method implemented by derived classes for loading algorithm specific parameters
-	 * @param file Path to file.
-	 */
-	void loadParametersFromXML(string file);
-
 
 
 private:
@@ -164,7 +173,8 @@ private:
 	 * @param scoreInit The score from the current iteration.
 	 * @return Reasonable stepsize
 	 */
-	double lineSearch(Eigen::Vector3d &gradientInit, Eigen::Vector3d &poseIncrement, double scoreInit);
+	double lineSearch(Eigen::Vector3d &gradientInit,
+			Eigen::Vector3d &poseIncrement, double scoreInit);
 
 	/**
 	 * Borders of the cellstructure
@@ -217,7 +227,6 @@ private:
 	NdtTrace* _trace;
 
 	double** _searchTmp;
-
 
 };
 

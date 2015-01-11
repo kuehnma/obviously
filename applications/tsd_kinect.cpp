@@ -51,6 +51,7 @@ void _cbStoreModel(void)
 
 void _cbStoreScene(void)
 {
+
   static unsigned int id=0;
   char path[40];
   std::sprintf(path, "scene%04d.vtp",id);
@@ -252,10 +253,10 @@ void _cbRegNewImage(void)
   unsigned int pairs = 0;
   unsigned int iterations = 0;
 
-  EnumIcpState state = _icp->iterate(&rms, &pairs, &iterations);
+  EnumState state = _icp->iterate(&rms, &pairs, &iterations);
   LOGMSG(DBG_DEBUG, "Elapsed ICP: " << t.reset() << " s, state " << state << ", pairs: " << pairs << ", rms: " << rms);
 
-  if(((state == ICP_SUCCESS) && (rms < 0.1)) || ((state == ICP_MAXITERATIONS) && (rms < 0.1)))
+  if(((state == SUCCESS) && (rms < 0.1)) || ((state == MAXITERATIONS) && (rms < 0.1)))
   {
     // Obtain scene-to-model registration
     cout << "Scene-to-model registration" << endl;

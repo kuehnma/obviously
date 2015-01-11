@@ -76,7 +76,7 @@ public:
 	 * @param normals model normals, may be NULL
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
+virtual void setModel(Matrix* coords,Matrix* normals = NULL, double probability = 1.0) = 0;
 
 	/**
 	 * Copy scene to internal buffer
@@ -93,14 +93,15 @@ virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
 	 * @param normals scene normals, may be NULL
 	 * @param probability probability of coordinates of being sampled (range [0.0 1.0])
 	 */
-	virtual void setScene(Matrix* coords, double probability = 1.0) = 0;
+	virtual void setScene(Matrix* coords,Matrix* normals = NULL, double probability = 1.0) = 0;
 
 
 	/**
 	 * Abstract method implemented by derived classes for loading algorithm specific parameters
 	 * @param file Path to file.
+	 * @return -1 if loading the parameters was not successful.
 	 */
-	virtual void loadParametersFromXML(string filepath) = 0;
+	virtual int loadParametersFromXML(string filePath) = 0;
 
 
 	/**
@@ -134,14 +135,12 @@ virtual void setModel(Matrix* coords, double probability = 1.0) = 0;
 //	virtual EnumState step() = 0;
 
 	/**
-	 * Start iteration
-	 * @param rms return value of RMS error
-	 * @param pairs return value of pair assignments, i.e. number of pairs
-	 * @param iterations return value of performed iterations
-	 * @param Tinit apply initial transformation before iteration
+	 * Start registration process
+	 * @param Tinit Apply initial transformation before iteration.
+	 * @param verbose Set true if information about the registration are required in the console.
 	 * @return  processing state
 	 */
-	virtual EnumState iterate(double* rms, unsigned int* iterations, Matrix* Tinit=NULL) = 0;
+	virtual EnumState align(Matrix* Tinit=NULL, bool verbose=false) = 0;
 
 	/**
 	 * Get final 4x4 rotation matrix determined through iteration
@@ -183,6 +182,12 @@ protected:
 	void checkMemory(unsigned int rows, unsigned int cols,
 			unsigned int &memsize, double** &mem);
 
+	/**
+	 * Creates an one-dimensional bool array to randomly use points or not
+	 * @param size Number of points.
+	 * @param probability Probability a point is used after masking a pointcloud
+	 * @return mask
+	 */
 	static bool* createSubsamplingMask(unsigned int* size, double probability);
 
 

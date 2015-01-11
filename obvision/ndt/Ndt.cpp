@@ -4,11 +4,6 @@
 #include "obcore/base/Timer.h"
 #include "obcore/math/mathbase.h"
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <libxml++/libxml++.h>
-
 namespace obvious {
 
 Ndt::Ndt(int minX, int maxX, int minY, int maxY, double cellSize) :
@@ -57,7 +52,7 @@ Ndt::~Ndt() {
 	delete Registration::_Tlast;
 }
 
-void Ndt::setModel(Matrix* coords, double probability) {
+void Ndt::setModel(Matrix* coords,Matrix* normals, double probability) {
 
 	if (_trace) {
 		_trace->reset();
@@ -138,7 +133,7 @@ void Ndt::setModel(Matrix* coords, double probability) {
 	delete[] mask;
 }
 
-void Ndt::setScene(Matrix* coords, double probability) {
+void Ndt::setScene(Matrix* coords, Matrix* normals, double probability) {
 
 	if (coords->getCols() != (size_t) _dim) {
 		cout << "WARNING: Scene is not of correct dimensionality " << _dim
@@ -344,7 +339,7 @@ EnumState Ndt::step(Eigen::Matrix3d &hessian, Eigen::Vector3d &score_gradient,
 	return retState;
 }
 
-EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
+EnumState Ndt::iterate(unsigned int* iterations, Matrix* Tinit) {
 
 	unsigned int iter = 0;
 
@@ -355,14 +350,14 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 
 	EnumState eRetval = PROCESSING;
 	while (eRetval == PROCESSING) {
-		cout << "Iteration: " << iter << endl;
-		/** Reset iteration parameters **/
+		/** Reset per-iteration parameters **/
 		double score = 0;
 		Eigen::Vector3d score_gradient = Eigen::Vector3d::Zero();
 		Eigen::Matrix3d hessian = Eigen::Matrix3d::Zero();
 
 		//calculate one iteration and check return for errors
 		eRetval = step(hessian, score_gradient, score);
+
 		if (eRetval == NOTMATCHABLE) {
 			cout << "ERROR: There were no points in occupied cells" << endl;
 			break;
@@ -409,6 +404,71 @@ EnumState Ndt::iterate(double* rms, unsigned int* iterations, Matrix* Tinit) {
 	}
 	*iterations = iter;
 	return eRetval;
+}
+
+EnumState Ndt::align(Matrix* Tinit, bool verbose) {
+
+	unsigned int iterations;
+	EnumState state = iterate(&iterations, Tinit);
+
+	//Extra Information
+	if (verbose) {
+		cout << "NDT state: " << state << ", with " << iterations << " iterations): "
+				<< endl;
+	}
+
+}
+
+string getValue(string line) {
+	unsigned int start = line.find(": ") + strlen(": ");
+	unsigned int end = line.find(",");
+	if (end == string::npos) {
+		end = line.find("\n");
+	}
+
+	return line.substr(start, end - start);
+
+}
+
+int Ndt::loadParametersFromXML(string filePath) {
+	//Parameters
+		string algorithm;
+
+		int ret = 0;
+
+		//Parse File
+		string line;
+		ifstream file(filePath.c_str());
+		if (file.is_open()) {
+			while (getline(file, line)) {
+				if (line.find("algorithm") != string::npos) {
+					algorithm = getValue(line);
+				}
+
+				if (line.find("iterations") != string::npos) {
+					Registration::_maxIterations = std::atoi(getValue(line).c_str());
+				}
+
+				if (line.find("cellSize") != string::npos) {
+					_cellSize = atof(getValue(line).c_str());
+				}
+			}
+		} else {
+			cout << "Parsing Registration Parameters: Unable to open file";
+			ret = -1;
+		}
+		file.close();
+
+		//Check parameters
+		if (algorithm != "NDT" || Registration::_maxIterations <= 0 || _cellSize <= 0) {
+			cout << "Parsing Registration Parameters: Parameters invalid." << endl
+					<< "NDT intended to use." << endl << "Algorithm is " << algorithm
+					<< endl << "Iterations: " << Registration::_maxIterations << " Cell Size: "
+					<< _cellSize << endl << endl;
+			ret = -1;
+		}
+
+		return ret;
 }
 
 void Ndt::EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
@@ -499,90 +559,5 @@ double Ndt::lineSearch(Eigen::Vector3d &gradientInit,
 	return stepSize;
 }
 
-///////////////////////////////////////////////////////////////
-// XML Parser
-//////////////////////////////////////////////////////////////
 
-
-/**
- * Abstract method implemented by derived classes for loading algorithm specific parameters
- * @param file Path to file.
- */
-
-void print_indentation(unsigned int indentation)
-{
-  for(unsigned int i = 0; i < indentation; ++i)
-    std::cout << " ";
-}
-
-void print_node(const xmlpp::Node* node, unsigned int indentation = 0)
-{
-  std::cout << std::endl; //Separate nodes by an empty line.
-
-  const xmlpp::ContentNode* nodeContent = dynamic_cast<const xmlpp::ContentNode*>(node);
-  const xmlpp::TextNode* nodeText = dynamic_cast<const xmlpp::TextNode*>(node);
-  const xmlpp::CommentNode* nodeComment = dynamic_cast<const xmlpp::CommentNode*>(node);
-
-  if(nodeText && nodeText->is_white_space()) //Let's ignore the indenting - you don't always want to do this.
-    return;
-
-  Glib::ustring nodename = node->get_name();
-
-  if(!nodeText && !nodeComment && !nodename.empty()) //Let's not say "name: text".
-  {
-    print_indentation(indentation);
-    std::cout << "Node name = " << node->get_name() << std::endl;
-    std::cout << "Node name = " << nodename << std::endl;
-  }
-
-
-  if(const xmlpp::Element* nodeElement = dynamic_cast<const xmlpp::Element*>(node))
-  {
-    //A normal Element node:
-
-    //line() works only for ElementNodes.
-    print_indentation(indentation);
-    std::cout << "     line = " << node->get_line() << std::endl;
-
-    //Print attributes:
-    const xmlpp::Element::AttributeList& attributes = nodeElement->get_attributes();
-    for(xmlpp::Element::AttributeList::const_iterator iter = attributes.begin(); iter != attributes.end(); ++iter)
-    {
-      const xmlpp::Attribute* attribute = *iter;
-      print_indentation(indentation);
-      std::cout << "  Attribute " << attribute->get_name() << " = " << attribute->get_value() << std::endl;
-    }
-
-    const xmlpp::Attribute* attribute = nodeElement->get_attribute("title");
-    if(attribute)
-    {
-      std::cout << "title found: =" << attribute->get_value() << std::endl;
-
-    }
-  }
-
-}
-
-void Ndt::loadParametersFromXML(string filepath) {
-
-  try
-	  {
-	    xmlpp::DomParser parser;
-	    parser.set_validate();
-	    parser.set_substitute_entities(); //We just want the text to be resolved/unescaped automatically.
-	    parser.parse_file(filepath);
-	    if(parser)
-	    {
-	      //Walk the tree:
-	      const xmlpp::Node* pNode = parser.get_document()->get_root_node(); //deleted by DomParser.
-	      print_node(pNode);
-	    }
-	  }
-	  catch(const std::exception& ex)
-	  {
-	    std::cout << "Exception caught: " << ex.what() << std::endl;
-	  }
-
-	  //return 0;
-}
 

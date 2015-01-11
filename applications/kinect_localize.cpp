@@ -59,7 +59,7 @@ public:
         double rms;
         unsigned int pairs;
         unsigned int it;
-        EnumIcpState state  = _icp->iterate(&rms, &pairs, &it);
+        EnumState state  = _icp->iterate(&rms, &pairs, &it);
 
         obvious::Matrix T           = _icp->getFinalTransformation();
         //cout << "print T" << endl;
