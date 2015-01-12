@@ -5,7 +5,8 @@
 
 namespace obvious {
 
-Icp::Icp(PairAssignment* assigner, IRigidEstimator* estimator) {
+Icp::Icp(PairAssignment* assigner, IRigidEstimator* estimator) :
+		Registration() {
 	_assigner = assigner;
 	_estimator = estimator;
 
@@ -54,7 +55,6 @@ Icp::~Icp() {
 	}
 }
 
-
 void Icp::activateTrace() {
 	_trace = new IcpTrace(Registration::_dim);
 }
@@ -78,7 +78,8 @@ void Icp::setModel(double* coords, double* normals, const unsigned int size,
 	bool* mask = Registration::createSubsamplingMask(&_sizeModel, probability);
 
 	unsigned int sizeNormalsBuf = _sizeModelBuf;
-	Registration::checkMemory(_sizeModel, Registration::_dim, _sizeModelBuf, _model);
+	Registration::checkMemory(_sizeModel, Registration::_dim, _sizeModelBuf,
+			_model);
 	unsigned int idx = 0;
 	for (unsigned int i = 0; i < size; i++) {
 		if (mask[i]) {
@@ -89,11 +90,13 @@ void Icp::setModel(double* coords, double* normals, const unsigned int size,
 	}
 
 	if (normals) {
-		Registration::checkMemory(_sizeModel, Registration::_dim, sizeNormalsBuf, _normalsM);
+		Registration::checkMemory(_sizeModel, Registration::_dim,
+				sizeNormalsBuf, _normalsM);
 		idx = 0;
 		for (unsigned int i = 0; i < size; i++) {
 			if (mask[i]) {
-				for (unsigned int j = 0; j < (unsigned int) Registration::_dim; j++)
+				for (unsigned int j = 0; j < (unsigned int) Registration::_dim;
+						j++)
 					_normalsM[idx][j] = normals[Registration::_dim * i + j];
 				idx++;
 			}
@@ -119,7 +122,8 @@ void Icp::setModel(Matrix* coords, Matrix* normals, double probability) {
 
 	unsigned int sizeNormals = _sizeModelBuf;
 
-	Registration::checkMemory(_sizeModel, Registration::_dim, _sizeModelBuf, _model);
+	Registration::checkMemory(_sizeModel, Registration::_dim, _sizeModelBuf,
+			_model);
 
 	unsigned int idx = 0;
 	for (unsigned int i = 0; i < sizeSource; i++) {
@@ -131,11 +135,13 @@ void Icp::setModel(Matrix* coords, Matrix* normals, double probability) {
 	}
 
 	if (normals) {
-		Registration::checkMemory(_sizeModel, Registration::_dim, sizeNormals, _normalsM);
+		Registration::checkMemory(_sizeModel, Registration::_dim, sizeNormals,
+				_normalsM);
 		idx = 0;
 		for (unsigned int i = 0; i < sizeSource; i++) {
 			if (mask[i]) {
-				for (unsigned int j = 0; j < (unsigned int) Registration::_dim; j++)
+				for (unsigned int j = 0; j < (unsigned int) Registration::_dim;
+						j++)
 					_normalsM[idx][j] = (*normals)(i, j);
 				idx++;
 			}
@@ -159,7 +165,8 @@ void Icp::setScene(double* coords, double* normals, const unsigned int size,
 	bool* mask = Registration::createSubsamplingMask(&_sizeScene, probability);
 
 	unsigned int sizeNormalsBuf = _sizeSceneBuf;
-	Registration::checkMemory(_sizeScene, Registration::_dim, _sizeSceneBuf, _scene);
+	Registration::checkMemory(_sizeScene, Registration::_dim, _sizeSceneBuf,
+			_scene);
 	unsigned int idx = 0;
 	for (unsigned int i = 0; i < size; i++) {
 		if (mask[i]) {
@@ -174,11 +181,13 @@ void Icp::setScene(double* coords, double* normals, const unsigned int size,
 	System<double>::copy(_sizeScene, Registration::_dim, _scene, _sceneTmp);
 
 	if (normals) {
-		Registration::checkMemory(_sizeScene, Registration::_dim, sizeNormalsBuf, _normalsS);
+		Registration::checkMemory(_sizeScene, Registration::_dim,
+				sizeNormalsBuf, _normalsS);
 		idx = 0;
 		for (unsigned int i = 0; i < size; i++) {
 			if (mask[i]) {
-				for (unsigned int j = 0; j < (unsigned int) Registration::_dim; j++)
+				for (unsigned int j = 0; j < (unsigned int) Registration::_dim;
+						j++)
 					_normalsS[idx][j] = normals[Registration::_dim * i + j];
 				idx++;
 			}
@@ -186,7 +195,8 @@ void Icp::setScene(double* coords, double* normals, const unsigned int size,
 		if (_normalsSTmp)
 			System<double>::deallocate(_normalsSTmp);
 		System<double>::allocate(_sizeScene, Registration::_dim, _normalsSTmp);
-		System<double>::copy(_sizeScene, Registration::_dim, _normalsS, _normalsSTmp);
+		System<double>::copy(_sizeScene, Registration::_dim, _normalsS,
+				_normalsSTmp);
 	}
 
 	delete[] mask;
@@ -194,8 +204,8 @@ void Icp::setScene(double* coords, double* normals, const unsigned int size,
 
 void Icp::setScene(Matrix* coords, Matrix* normals, double probability) {
 	if (coords->getCols() != (size_t) Registration::_dim) {
-		cout << "WARNING: Scene is not of correct dimensionality " << Registration::_dim
-				<< endl;
+		cout << "WARNING: Scene is not of correct dimensionality "
+				<< Registration::_dim << endl;
 		return;
 	}
 
@@ -205,7 +215,8 @@ void Icp::setScene(Matrix* coords, Matrix* normals, double probability) {
 
 	unsigned int sizeNormals = _sizeSceneBuf;
 
-	Registration::checkMemory(_sizeScene, Registration::_dim, _sizeSceneBuf, _scene);
+	Registration::checkMemory(_sizeScene, Registration::_dim, _sizeSceneBuf,
+			_scene);
 	unsigned int idx = 0;
 	for (unsigned int i = 0; i < sizeSource; i++) {
 		if (mask[i]) {
@@ -220,11 +231,13 @@ void Icp::setScene(Matrix* coords, Matrix* normals, double probability) {
 	System<double>::copy(_sizeScene, Registration::_dim, _scene, _sceneTmp);
 
 	if (normals) {
-		Registration::checkMemory(_sizeScene, Registration::_dim, sizeNormals, _normalsS);
+		Registration::checkMemory(_sizeScene, Registration::_dim, sizeNormals,
+				_normalsS);
 		idx = 0;
 		for (unsigned int i = 0; i < sizeSource; i++) {
 			if (mask[i]) {
-				for (unsigned int j = 0; j < (unsigned int) Registration::_dim; j++)
+				for (unsigned int j = 0; j < (unsigned int) Registration::_dim;
+						j++)
 					_normalsS[idx][j] = (*normals)(i, j);
 				idx++;
 			}
@@ -232,13 +245,12 @@ void Icp::setScene(Matrix* coords, Matrix* normals, double probability) {
 		if (_normalsSTmp)
 			System<double>::deallocate(_normalsSTmp);
 		System<double>::allocate(_sizeScene, Registration::_dim, _normalsSTmp);
-		System<double>::copy(_sizeScene, Registration::_dim, _normalsS, _normalsSTmp);
+		System<double>::copy(_sizeScene, Registration::_dim, _normalsS,
+				_normalsSTmp);
 	}
 
 	delete[] mask;
 }
-
-
 
 void Icp::reset() {
 	Registration::_Tfinal4x4->setIdentity();
@@ -246,7 +258,8 @@ void Icp::reset() {
 	if (_sceneTmp)
 		System<double>::copy(_sizeScene, Registration::_dim, _scene, _sceneTmp);
 	if (_normalsSTmp)
-		System<double>::copy(_sizeScene, Registration::_dim, _normalsS, _normalsSTmp);
+		System<double>::copy(_sizeScene, Registration::_dim, _normalsS,
+				_normalsSTmp);
 }
 /**
  * @deprecated
@@ -262,7 +275,6 @@ double Icp::getMaxRMS() {
 	return _maxRMS;
 }
 
-
 /**
  * @deprecated
  */
@@ -276,8 +288,6 @@ void Icp::setConvergenceCounter(unsigned int convCnt) {
 unsigned int Icp::getConvergenceCounter() {
 	return _convCnt;
 }
-
-
 
 EnumState Icp::step(double* rms, unsigned int* pairs) {
 	Timer t;
@@ -306,12 +316,15 @@ EnumState Icp::step(double* rms, unsigned int* pairs) {
 		// estimate transformation
 		_estimator->estimateTransformation(Registration::_Tlast);
 
-		Registration::applyTransformation(_sceneTmp, _sizeScene, Registration::_dim, Registration::_Tlast);
+		Registration::applyTransformation(_sceneTmp, _sizeScene,
+				Registration::_dim, Registration::_Tlast);
 		if (_normalsS)
-			Registration::applyTransformation(_normalsSTmp, _sizeScene, Registration::_dim, Registration::_Tlast);
+			Registration::applyTransformation(_normalsSTmp, _sizeScene,
+					Registration::_dim, Registration::_Tlast);
 
 		// update overall transformation
-		(*Registration::_Tfinal4x4) = (*Registration::_Tlast) * (*Registration::_Tfinal4x4);
+		(*Registration::_Tfinal4x4) = (*Registration::_Tlast)
+				* (*Registration::_Tfinal4x4);
 	} else {
 		retval = NOTMATCHABLE;
 	}
@@ -329,9 +342,11 @@ EnumState Icp::iterate(double* rms, unsigned int* pairs,
 	Registration::_Tfinal4x4->setIdentity();
 
 	if (Tinit) {
-		Registration::applyTransformation(_sceneTmp, _sizeScene, Registration::_dim, Tinit);
+		Registration::applyTransformation(_sceneTmp, _sizeScene,
+				Registration::_dim, Tinit);
 		if (_normalsSTmp)
-			Registration::applyTransformation(_normalsSTmp, _sizeScene, Registration::_dim, Tinit);
+			Registration::applyTransformation(_normalsSTmp, _sizeScene,
+					Registration::_dim, Tinit);
 		(*Registration::_Tfinal4x4) = (*Tinit) * (*Registration::_Tfinal4x4);
 	}
 
@@ -363,7 +378,7 @@ EnumState Icp::align(Matrix* Tinit, bool verbose) {
 	double rms;
 	unsigned int pairs;
 	unsigned int it;
-	iterate(&rms, &pairs, &it,Tinit);
+	iterate(&rms, &pairs, &it, Tinit);
 	if (verbose) {
 		cout << endl << "Error: " << _estimator->getRMS() << endl;
 		cout << "Iterations: " << _estimator->getIterations() << endl;
@@ -382,52 +397,47 @@ string getValue(string line) {
 }
 
 int Icp::loadParametersFromXML(string filePath) {
-		int ret = 0;
-		string algorithm;
-		string line;
 
-		ifstream file(filePath.c_str());
-		if (file.is_open()) {
-			while (getline(file, line)) {
-				if (line.find("algorithm") != string::npos) {
-					algorithm = getValue(line);
-				}
+	string algorithm;
+	string line;
+	ifstream file(filePath.c_str());
 
-				if (line.find("iterations") != string::npos) {
-					Registration::_maxIterations = std::atoi(getValue(line).c_str());
-				}
-
-				if (line.find("maxRMS") != string::npos) {
-					_maxRMS = atof(getValue(line).c_str());
-				}
-				if (line.find("ConvCnt") != string::npos) {
-					_convCnt = atoi(getValue(line).c_str());
-				}
+	if (file.is_open()) {
+		while (getline(file, line)) {
+			if (line.find("algorithm") != string::npos) {
+				algorithm = getValue(line);
+			} else if (line.find("iterations") != string::npos) {
+				Registration::_maxIterations = std::atoi(
+						getValue(line).c_str());
+			} else if (line.find("maxRMS") != string::npos) {
+				_maxRMS = atof(getValue(line).c_str());
+			} else if (line.find("ConvCnt") != string::npos) {
+				_convCnt = atoi(getValue(line).c_str());
 			}
-		} else {
-			cout << "Parsing Registration Parameters: Unable to open file";
-			ret = -1;
 		}
-		file.close();
+	} else {
+		cout << "Parsing Registration Parameters: Unable to open file" << endl;
+		return -1;
+	}
+	file.close();
 
-		//Check parameters
-		if (algorithm != "ICP" || Registration::_maxIterations <= 0 || _maxRMS < 0 || _convCnt < 0) {
-			cout << "Parsing Registration Parameters: Parameters invalid." << endl
-					<< "ICP intended to use." << endl << "Algorithm is " << algorithm
-					<< endl << "Iterations: " << Registration::_maxIterations << " MaxRMS: "<< _maxRMS <<" ConvCnt: "<<_convCnt<<endl << endl;
-			ret = -1;
-		}
+	//Check parameters
+	if (algorithm != "ICP" || Registration::_maxIterations <= 0 || _maxRMS < 0
+			|| _convCnt < 0) {
+		cout << "Parsing Registration Parameters: Parameters invalid." << endl
+				<< "ICP intended to use." << endl << "Algorithm is "
+				<< algorithm << endl << "Iterations: "
+				<< Registration::_maxIterations << " MaxRMS: " << _maxRMS
+				<< " ConvCnt: " << _convCnt << endl << endl;
+		return -1;
+	}
 
-		return ret;
+	return 0;
 }
-
-
 
 void Icp::serializeTrace(char* folder, unsigned int delay) {
 	if (_trace)
 		_trace->serialize(folder, delay);
 }
-
-
 
 }

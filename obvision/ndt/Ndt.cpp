@@ -52,7 +52,7 @@ Ndt::~Ndt() {
 	delete Registration::_Tlast;
 }
 
-void Ndt::setModel(Matrix* coords,Matrix* normals, double probability) {
+void Ndt::setModel(Matrix* coords, Matrix* normals, double probability) {
 
 	if (_trace) {
 		_trace->reset();
@@ -413,8 +413,8 @@ EnumState Ndt::align(Matrix* Tinit, bool verbose) {
 
 	//Extra Information
 	if (verbose) {
-		cout << "NDT state: " << state << ", with " << iterations << " iterations): "
-				<< endl;
+		cout << "NDT state: " << state << ", with " << iterations
+				<< " iterations): " << endl;
 	}
 
 }
@@ -431,44 +431,41 @@ string getValue(string line) {
 }
 
 int Ndt::loadParametersFromXML(string filePath) {
-	//Parameters
-		string algorithm;
+	string algorithm;
+	string line;
+	ifstream file(filePath.c_str());
 
-		int ret = 0;
-
-		//Parse File
-		string line;
-		ifstream file(filePath.c_str());
-		if (file.is_open()) {
-			while (getline(file, line)) {
-				if (line.find("algorithm") != string::npos) {
-					algorithm = getValue(line);
-				}
-
-				if (line.find("iterations") != string::npos) {
-					Registration::_maxIterations = std::atoi(getValue(line).c_str());
-				}
-
-				if (line.find("cellSize") != string::npos) {
-					_cellSize = atof(getValue(line).c_str());
-				}
+	if (file.is_open()) {
+		while (getline(file, line)) {
+			if (line.find("algorithm") != string::npos) {
+				algorithm = getValue(line);
 			}
-		} else {
-			cout << "Parsing Registration Parameters: Unable to open file";
-			ret = -1;
+			else if (line.find("iterations") != string::npos) {
+				Registration::_maxIterations = std::atoi(
+						getValue(line).c_str());
+			}
+			else if (line.find("cellSize") != string::npos) {
+				_cellSize = atof(getValue(line).c_str());
+			}
 		}
-		file.close();
+	} else {
+		cout << "Parsing Registration Parameters: Unable to open file";
+		return -1;
+	}
+	file.close();
 
-		//Check parameters
-		if (algorithm != "NDT" || Registration::_maxIterations <= 0 || _cellSize <= 0) {
-			cout << "Parsing Registration Parameters: Parameters invalid." << endl
-					<< "NDT intended to use." << endl << "Algorithm is " << algorithm
-					<< endl << "Iterations: " << Registration::_maxIterations << " Cell Size: "
-					<< _cellSize << endl << endl;
-			ret = -1;
-		}
+	//Check parameters
+	if (algorithm != "NDT" || Registration::_maxIterations <= 0
+			|| _cellSize <= 0) {
+		cout << "Parsing Registration Parameters: Parameters invalid." << endl
+				<< "NDT intended to use." << endl << "Algorithm is "
+				<< algorithm << endl << "Iterations: "
+				<< Registration::_maxIterations << " Cell Size: " << _cellSize
+				<< endl << endl;
+		return -1;
+	}
 
-		return ret;
+	return 0;
 }
 
 void Ndt::EigenMatrix4dToObviouslyMatrix(obvious::Matrix* obviousMat,
@@ -558,6 +555,4 @@ double Ndt::lineSearch(Eigen::Vector3d &gradientInit,
 //cout<<"Stepsize: "<<stepSize<<endl;
 	return stepSize;
 }
-
-
 
