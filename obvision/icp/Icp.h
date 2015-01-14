@@ -170,7 +170,7 @@ public:
 	 * Abstract method implemented by derived classes for loading algorithm specific parameters
 	 * @param file Path to file.
 	 */
-	int loadParametersFromXML(string filepath);
+	int loadParametersFromXML(string filePath);
 
 	/**
 	 * Serialize assignment to trace folder

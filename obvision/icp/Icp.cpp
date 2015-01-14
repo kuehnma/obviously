@@ -254,7 +254,9 @@ void Icp::setScene(Matrix* coords, Matrix* normals, double probability) {
 
 void Icp::reset() {
 	Registration::_Tfinal4x4->setIdentity();
+
 	_assigner->reset();
+
 	if (_sceneTmp)
 		System<double>::copy(_sizeScene, Registration::_dim, _scene, _sceneTmp);
 	if (_normalsSTmp)
@@ -400,9 +402,11 @@ int Icp::loadParametersFromXML(string filePath) {
 
 	string algorithm;
 	string line;
-	ifstream file(filePath.c_str());
-
+	ifstream file(filePath.c_str(), std::ifstream::in);
+	cout<<"File "<<file.is_open()<<endl;
 	if (file.is_open()) {
+		cout<<"P1 "<<endl;
+
 		while (getline(file, line)) {
 			if (line.find("algorithm") != string::npos) {
 				algorithm = getValue(line);
@@ -414,16 +418,22 @@ int Icp::loadParametersFromXML(string filePath) {
 			} else if (line.find("ConvCnt") != string::npos) {
 				_convCnt = atoi(getValue(line).c_str());
 			}
+			cout<<"T2 "<<endl;
+
 		}
 	} else {
 		cout << "Parsing Registration Parameters: Unable to open file" << endl;
 		return -1;
 	}
+	cout<<"T3 "<<endl;
+
 	file.close();
+	cout<<"T4 "<<endl;
+
 
 	//Check parameters
 	if (algorithm != "ICP" || Registration::_maxIterations <= 0 || _maxRMS < 0
-			|| _convCnt < 0) {
+			|| _convCnt <= 0) {
 		cout << "Parsing Registration Parameters: Parameters invalid." << endl
 				<< "ICP intended to use." << endl << "Algorithm is "
 				<< algorithm << endl << "Iterations: "
@@ -431,6 +441,8 @@ int Icp::loadParametersFromXML(string filePath) {
 				<< " ConvCnt: " << _convCnt << endl << endl;
 		return -1;
 	}
+	cout<<"T5 "<<endl;
+
 
 	return 0;
 }
