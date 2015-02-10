@@ -3,6 +3,7 @@
 
 #include <flann/flann.hpp>
 #include "obcore/math/linalg/linalg.h"
+#include "omp.h"
 
 namespace obvious
 {
