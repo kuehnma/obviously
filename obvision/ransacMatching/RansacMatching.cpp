@@ -136,7 +136,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S,
 		cerr<<"Number of Threads: "<< omp_get_num_threads()<<endl;
 		#pragma omp for
 		for (unsigned int trial = 0; trial < _trials; trial++) {
-			cerr<<"Number of Threads: "<< omp_get_num_threads()<<endl;
 			// First model sample: Index i (only from center part)
 			unsigned int i = rand() % (3 * pointsM / 8) + pointsM / 4;
 
@@ -242,6 +241,8 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S,
 
 					err /= cntMatch;
 
+					// This part is only accessible by a single thread.
+					// This ensures that a thread that finished one iteration is doing the comparison of the best results with valid data.
 					#pragma omp critical
 					{
 						if (cntMatch > cntBest) {
