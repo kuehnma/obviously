@@ -133,6 +133,7 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S,
 	double errBest = 1e12;
 #pragma omp parallel
 {
+		cerr<<"Number of Threads: "<< omp_get_num_threads()<<endl;
 		#pragma omp for
 		for (unsigned int trial = 0; trial < _trials; trial++) {
 			cerr<<"Number of Threads: "<< omp_get_num_threads()<<endl;
