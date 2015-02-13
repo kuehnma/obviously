@@ -19,7 +19,7 @@ namespace obvious {
 RansacMatching::RansacMatching(unsigned int trials, double epsThresh,
 		unsigned int sizeControlSet, bool clipPeripheralArea) {
 
-	_epsDist = epsThresh;
+  _epsSqr = epsThresh*epsThresh;
 	_trials = trials;
 	_sizeControlSet = sizeControlSet;
 	_clipPeripheralArea = clipPeripheralArea;

@@ -242,12 +242,6 @@ for(unsigned int i = 0; i < mask.size(); i++)
   _mask[i] = mask[i];
 }
 
-void Sensor::maskZeroDepth()
-{
-for(unsigned int i = 0; i < _size; i++)
-  _mask[i] = (_data[i] == 0.0);
-}
-
 bool* Sensor::getRealMeasurementMask()
 {
 return _mask;
