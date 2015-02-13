@@ -132,6 +132,30 @@ public:
    */
   unsigned int dataToCartesianVector(double* &coords);
 
+  /**
+   * Convert distance data in measurement array to Cartesian coordinates in sensor coordinate system
+   * @param coords Output array of size dim*size. Output is grouped in n-tuples [x1 y1 ....]
+   * @param mask Validity mask
+   * @return number of valid points, i.e., having mask[i]==true
+   */
+  unsigned int dataToCartesianVectorMask(double* &coords, bool* validityMask);
+
+  /**
+   * Removes points from a double vector [x1 y1 ....] according to a given mask.
+   * @param inPoints A 2d double array that contains the point to be filtered
+   * @param mask  The mask that describes which points are valid (true) or invalid (false)
+   * @param sizeMask Size of the mask array. The inPoints array must contain the same amount of points (not double fields!)
+   * @param outPoints An initialized 2d double array with the size of validPoints*2. This size is an output of dataToCartesianVectorMask.
+   * @return Number of valid Points again. Test if this is equal to the output of dataToCartesianVectorMask.
+   */
+  unsigned int removeInvalidPoints(double* inPoints, bool* mask, unsigned int sizeMask, double* outPoints);
+
+
+
+  /**
+   * Convert distance measurements to Cartesian coordinates represented as matrix
+   * @return Cartesian coordinate matrix
+   */
   Matrix dataToHomogeneousCoordMatrix();
 
   virtual void setRealMeasurementAccuracy(double* accuracy);

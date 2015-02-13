@@ -34,14 +34,20 @@ public:
    * Matching method
    * @param M model
    * @param S scene
+   * @param maskM Mask with fields = true for valid points in the scene S
+   * @param maskS Mas with fields = true for valid points in the model M
+   * @param validPointsM Number of valid points in the model M
+   * @param validPointsS Number of valid points in the scene S
+   * @param phiMax The algorithm will not obtain rotations between two scans bigger than this.
+   * @param resolution Resolution of the laser scan (angular distance between obtained measurements)
    * @return 3x3 registration matrix
    */
-  obvious::Matrix match(obvious::Matrix* M, obvious::Matrix* S, double phiMax = M_PI / 4.0);
+  obvious::Matrix match(obvious::Matrix* M, obvious::Matrix* S, bool* maskM, bool* maskS, unsigned int validPointsM, unsigned int validPointsS, double phiMax, double resolution);
 
 private:
 
-  // distance threshold
-  double _epsDist;
+  // squared distance threshold
+  double _epsSqr;
 
   // number of trials
   unsigned int _trials;

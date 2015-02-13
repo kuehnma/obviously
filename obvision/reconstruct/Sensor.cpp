@@ -20,25 +20,27 @@ Sensor::Sensor(unsigned int dim, double maxRange, double minRange, double lowRef
 
   _rayNorm = 1.0;
 
-  _T = new Matrix(_dim+1, _dim+1);
+  _T = new Matrix(_dim + 1, _dim + 1);
   _T->setIdentity();
 }
 
 Sensor::~Sensor()
 {
   delete _T;
-  if(_rgb) delete [] _rgb;
-  if(_accuracy) delete [] _accuracy;
+  if(_rgb)
+    delete[] _rgb;
+  if(_accuracy)
+    delete[] _accuracy;
 }
 
 Matrix* Sensor::getNormalizedRayMap(double norm)
 {
   if(norm != _rayNorm)
   {
-    for(unsigned int i=0; i<_size; i++)
+    for(unsigned int i = 0; i < _size; i++)
     {
-      for(unsigned int j=0; j<_dim; j++)
-        (*_rays)(j, i) *= (norm/_rayNorm);
+      for(unsigned int j = 0; j < _dim; j++)
+        (*_rays)(j, i) *= (norm / _rayNorm);
     }
     _rayNorm = norm;
   }
@@ -59,7 +61,7 @@ void Sensor::transform(Matrix* T)
 
 void Sensor::translate(double* tr)
 {
-  for(unsigned int r=0; r<_dim; r++)
+  for(unsigned int r = 0; r < _dim; r++)
     (*_T)(r, _dim) += tr[r];
 }
 
@@ -70,7 +72,7 @@ unsigned int Sensor::getWidth()
 
 unsigned int Sensor::getHeight()
 {
-  if(_dim<3)
+  if(_dim < 3)
   {
     LOGMSG(DBG_ERROR, "Sensor does not provide a two-dimensional measurement array");
     return 0;
@@ -111,7 +113,7 @@ void Sensor::resetTransformation()
 
 void Sensor::getPosition(obfloat* tr)
 {
-  for(unsigned int i=0; i<_dim; i++)
+  for(unsigned int i = 0; i < _dim; i++)
     tr[i] = (*_T)(i, _dim);
 }
 
@@ -122,23 +124,23 @@ unsigned int Sensor::getRealMeasurementSize()
 
 void Sensor::setRealMeasurementData(double* data, double scale)
 {
-  if(scale==1.0)
-    memcpy(_data, data, _size*sizeof(*data));
+  if(scale == 1.0)
+    memcpy(_data, data, _size * sizeof(*data));
   else
   {
-    for(unsigned int i=0; i<_size; i++)
+    for(unsigned int i = 0; i < _size; i++)
       _data[i] = data[i] * scale;
   }
 }
 
 void Sensor::setRealMeasurementData(vector<float> data, float scale)
 {
-  if(data.size()!=_size)
+  if(data.size() != _size)
   {
     LOGMSG(DBG_WARN, "Size of measurement array wrong, expected " << _size << " obtained: " << data.size());
   }
 
-  for(unsigned int i=0; i<data.size(); i++)
+  for(unsigned int i = 0; i < data.size(); i++)
     _data[i] = (double)(data[i] * scale);
 }
 
@@ -150,14 +152,51 @@ double* Sensor::getRealMeasurementData()
 unsigned int Sensor::dataToCartesianVector(double* &coords)
 {
   unsigned int cnt = 0;
-  for(unsigned int i=0; i<_size; i++)
+  for(unsigned int i = 0; i < _size; i++)
   {
     if(!isinf(_data[i]) && _mask[i])
     {
-      for(unsigned int j=0; j<_dim; j++)
+      for(unsigned int j = 0; j < _dim; j++)
       {
-        coords[cnt++] = (*_raysLocal)(j, i) * _data[i];
+        coords[cnt++ ] = (*_raysLocal)(j, i) * _data[i];
       }
+    }
+  }
+  return cnt;
+}
+
+unsigned int Sensor::dataToCartesianVectorMask(double* &coords, bool* validityMask)
+{
+  unsigned int cnt = 0;
+  for(unsigned int i = 0; i < _size; i++)
+  {
+    if(!isinf(_data[i]) && _mask[i])
+    {
+      for(unsigned int j = 0; j < _dim; j++)
+      {
+        coords[i] = (*_raysLocal)(j, i) * _data[i];
+      }
+      validityMask[i] = true;
+      cnt++;
+    }
+    else
+    {
+      validityMask[i] = false;
+    }
+  }
+  return cnt;
+}
+
+unsigned int Sensor::removeInvalidPoints(double* inPoints, bool* mask, unsigned int sizeMask, double* outPoints)
+{
+  unsigned int cnt = 0;
+  for(unsigned int i = 0; i < sizeMask; i++)
+  {
+    if(mask[i] == true)
+    {
+      outPoints[cnt*2] = inPoints[i*2];
+      outPoints[cnt*2+1] = inPoints[i*2+1];
+      cnt++;
     }
   }
   return cnt;
@@ -165,62 +204,70 @@ unsigned int Sensor::dataToCartesianVector(double* &coords)
 
 Matrix Sensor::dataToHomogeneousCoordMatrix()
 {
-  Matrix M(_dim+1, _size);
-  for(unsigned int i=0; i<_size; i++)
-  {
-    for(unsigned int j=0; j<_dim; j++)
-      M(j, i) = (*_raysLocal)(j, i) * _data[i];
-    M(_dim, i) = 1.0;
-  }
-  return M;
+Matrix M(_dim + 1, _size);
+for(unsigned int i = 0; i < _size; i++)
+{
+  for(unsigned int j = 0; j < _dim; j++)
+    M(j, i) = (*_raysLocal)(j, i) * _data[i];
+  M(_dim, i) = 1.0;
+}
+return M;
 }
 
 void Sensor::setRealMeasurementAccuracy(double* accuracy)
 {
-  if(!_accuracy) _accuracy = new double[_size];
-  memcpy(_accuracy, accuracy, _size*sizeof(*accuracy));
+if(!_accuracy)
+  _accuracy = new double[_size];
+memcpy(_accuracy, accuracy, _size * sizeof(*accuracy));
 }
 
 double* Sensor::getRealMeasurementAccuracy()
 {
-  return _accuracy;
+return _accuracy;
 }
 
 bool Sensor::hasRealMeasurmentAccuracy()
 {
-  return (_accuracy!=NULL);
+return (_accuracy != NULL);
 }
 
 void Sensor::setRealMeasurementMask(bool* mask)
 {
-  memcpy(_mask, mask, _size*sizeof(*mask));
+memcpy(_mask, mask, _size * sizeof(*mask));
 }
 
 void Sensor::setRealMeasurementMask(vector<unsigned char> mask)
 {
-  for(unsigned int i=0; i<mask.size(); i++)
-    _mask[i] = mask[i];
+for(unsigned int i = 0; i < mask.size(); i++)
+  _mask[i] = mask[i];
+}
+
+void Sensor::maskZeroDepth()
+{
+for(unsigned int i = 0; i < _size; i++)
+  _mask[i] = (_data[i] == 0.0);
 }
 
 bool* Sensor::getRealMeasurementMask()
 {
-  return _mask;
+return _mask;
 }
 
 bool Sensor::hasRealMeasurmentRGB()
 {
-  return (_rgb!=NULL);
+return (_rgb != NULL);
 }
 
 void Sensor::setRealMeasurementRGB(unsigned char* rgb)
 {
-  if(!_rgb) _rgb = new unsigned char[_size*3];
-  memcpy(_rgb, rgb, _size*3*sizeof(*rgb));
+if(!_rgb)
+  _rgb = new unsigned char[_size * 3];
+memcpy(_rgb, rgb, _size * 3 * sizeof(*rgb));
 }
 
 unsigned char* Sensor::getRealMeasurementRGB()
 {
-  return _rgb;
+return _rgb;
 }
 
 }

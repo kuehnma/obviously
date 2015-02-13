@@ -146,7 +146,7 @@ void RayCastPolar2D::calcCoordsFromCurrentViewMask(TsdGrid* grid, SensorPolar2D*
   _idxMin = sensor->getMinimumRange() / grid->getCellSize();
   _idxMax = sensor->getMaximumRange() / grid->getCellSize();
 
-#pragma omp parallel
+#pragma omp parallel reduction(+:cnt)
 {
   obfloat c[2];
   obfloat n[2];
