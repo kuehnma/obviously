@@ -39,6 +39,7 @@ RansacMatching::~RansacMatching() {
 
 obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bool* maskM, bool* maskS, unsigned int validPointsM, unsigned int validPointsS, double phiMax, double resolution)
 {
+  cerr<<"PHI Max "<<phiMax<<" Resolution: "<<resolution<<endl;
 
   obvious::Matrix TBest(3, 3);
   TBest.setIdentity();
@@ -51,15 +52,16 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
 
   unsigned int pointsM = M->getRows();
   unsigned int pointsS = S->getRows();
+  cerr<<"Size Scene/Model"<<pointsS<<"/"<<pointsM<<endl;
 
   // ------------------------------------------------------
   // Calculate interesting region of S according to phiMax
-  unsigned int indexMax;
-  int indexMin;
+  unsigned int indexMax = 0;
+  int indexMin = 0;
   if(resolution > 0.0)
   {
     //limit scene point search according to phiMax
-    indexMax = (int)phiMax / resolution;
+    indexMax = (unsigned int) (phiMax / resolution);
     indexMin -= indexMax;
   }
   else
@@ -68,7 +70,9 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
     indexMax = pointsS;
     indexMin = 0;
   }
-  cerr << "11" << endl;
+  cerr<<"Scan Indices: "<<indexMin<<"/"<<indexMax<<endl;
+
+  assert(indexMax != indexMin);
   // -----------------------------------------------------
   // Build FLANN tree for fast access to nearest neighbors
   unsigned int cols = M->getCols();
@@ -91,7 +95,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
   _index->buildIndex();
   // -----------------------------------------------------
 
-  cerr << "12" << endl;
   // -----------------------------------------------------
   // randomly pick points from scene as control set
   vector<unsigned int> indices;
@@ -137,7 +140,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
 
   LOGMSG(DBG_DEBUG, "Scene size: " << S->getRows() << ", Control set: " << idxControl.size());
 
-  cerr << "13" << endl;
   // -----------------------------------------------------
   // Lookup table for distances between scene points
   double** SDists;
@@ -151,7 +153,7 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
       SDists[j][j2] = dx * dx + dy * dy;
     }
   }
-  cerr<<"14"<<endl;
+
   // -----------------------------------------------------
 
   // -----------------------------------------------------
@@ -177,7 +179,13 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
       continue;
     }
 
-    cerr<<"15"<<endl;
+    if(i2 > i + indexMax) {
+      // For bigger indices i2 we will not find reasonable scene point
+      trailsTemp++;
+      cerr<<"Index i2 to big, try again";
+      continue;
+    }
+
     // Vector between model points (for determining orientation)
     double vM[2];
     vM[0] = (*M)(i2, 0) - (*M)(i, 0);
@@ -192,17 +200,18 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
 
     double pointS[2];
     double pointS2[2];
-
-    cerr<<"16"<<endl;
+    cerr<<"Model Indices: "<<i<<"/"<<i2<<endl;
     //Calculate interesting area of scene points according to phiMax, field of view (FoV) and number of sample points
     unsigned int jMin = max((int)(i + indexMin), 0);
     unsigned int jMax = min(i + indexMax, pointsS);
+    cerr<<"Interesting Region: "<<jMin<<"->"<<jMax<<endl;
+
     for(unsigned int j = jMin; j < jMax; j++)
     {
+
       // Assign scene sample j
       if(maskS[j] == false)
       {
-        cerr<<"17"<<endl;
         continue;  //invalid point, continue j loop for first scene point
       }
       pointS[0] = (*S)(j, 0);
@@ -226,7 +235,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
         }
       }
 
-      cerr<<"18"<<endl;
       if(distSMin < _epsSqr)
       {
         pointS2[0] = (*S)(jMinDist, 0);
@@ -266,7 +274,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
 
         obvious::Matrix STemp = T * SControl;  //SControl contains only valid points!
 
-        cerr << "19" << endl;
         // Determine how many nearest neighbors (model <-> scene) are close enough
         double q[2];
         unsigned int cntMatch = 0;
@@ -290,7 +297,6 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
         delete[] indices.ptr();
         delete[] dists.ptr();
 
-        cerr<<"20"<<endl;
 
         if(cntMatch == 0)
           continue;
@@ -302,6 +308,8 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
           errBest = err;
           cntBest = cntMatch;
           TBest = T;
+          cerr<<"T Best: "<< cntMatch<<endl;
+          TBest.print();
         }
         else if(cntMatch == cntBest)
         {
@@ -310,6 +318,8 @@ obvious::Matrix RansacMatching::match(obvious::Matrix* M, obvious::Matrix* S, bo
             errBest = err;
             cntBest = cntMatch;
             TBest = T;
+            cerr<<"Error less: "<< err<<endl;
+                      TBest.print();
           }
         }
       }  // if(fabs(phi) < _phiMax)
